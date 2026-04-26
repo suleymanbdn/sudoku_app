@@ -1,0 +1,62 @@
+{
+  "project_info": {
+    "project_number": "1080698565810",
+    "project_id": "zen-sudoku-no-ads",
+    "storage_bucket": "zen-sudoku-no-ads.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1080698565810:android:59a504fc164ba169e4c5ab",
+        "android_client_info": {
+          "package_name": "com.sudokubulmaca.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1080698565810-9v2fburcgvcu5fpfs9aeki3dfl2g669r.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sudokubulmaca.app",
+            "certificate_hash": "56c5eb79f58cc19e0378395384afd1d9fdc56918"
+          }
+        },
+        {
+          "client_id": "1080698565810-mng01km9bspfm0mf1u28ib657vlvrrv8.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.sudokubulmaca.app",
+            "certificate_hash": "f2c13656ad27858fd84138b0ee953b638097739a"
+          }
+        },
+        {
+          "client_id": "1080698565810-mcpeq6muvi9uf8r14vap6t91a7404l94.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7fvxGMqB1w-xfvl3tCehEQn8dYckadvU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1080698565810-mcpeq6muvi9uf8r14vap6t91a7404l94.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "1080698565810-eja6udt6otpsaif8k9kgqopskhpurrnm.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.sudoku.sudoku"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

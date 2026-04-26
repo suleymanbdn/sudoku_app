@@ -1,0 +1,12 @@
+# Play Store yayını için: bu dosyayı "key.properties" olarak kopyalayın (android/key.properties).
+# key.properties ve .jks dosyasını asla Git'e eklemeyin.
+#
+# Keystore oluşturma (JDK keytool):
+#   keytool -genkey -v -keystore upload-keystore.jks -keyalg RSA -keysize 2048 -validity 10000 -alias upload
+#
+# upload-keystore.jks dosyasını android/app/ klasörüne koyun; aşağıdaki storeFile yolu buna göredir.
+
+storePassword=YOUR_STORE_PASSWORD
+keyPassword=YOUR_KEY_PASSWORD
+keyAlias=upload
+storeFile=upload-keystore.jks

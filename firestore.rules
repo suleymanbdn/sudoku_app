@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /duel_matches/{docId} {
+
+      // Yalnızca eşleşmenin tarafları okuyabilir (host veya guest).
+      allow read: if request.auth != null
+                  && (request.auth.uid == resource.data.hostId
+                      || request.auth.uid == resource.data.guestId);
+
+      // Oluşturma: kimlik doğrulanmış kullanıcı, zorunlu alanları ve
+      // başlangıç fazını sağlamalı; hostId kendi uid'i olmalı.
+      allow create: if request.auth != null
+                    && request.resource.data.keys().hasAll([
+                         'seed', 'difficultyIndex', 'hostId',
+                         'phase', 'createdAt'
+                       ])
+                    && request.resource.data.hostId == request.auth.uid
+                    && request.resource.data.phase == 'waiting'
+                    && request.resource.data.seed is int
+                    && request.resource.data.difficultyIndex is int
+                    && request.resource.data.hostId is string
+                    && request.resource.data.hostId.size() > 0
+                    && request.resource.data.hostId.size() <= 64;
+
+      // Güncelleme: yalnızca host veya guest izin verilen alanları değiştirebilir.
+      // guestId alanı yalnızca bir kez yazılabilir (henüz boşken).
+      allow update: if request.auth != null
+                    && (request.auth.uid == resource.data.hostId
+                        || request.auth.uid == resource.data.guestId
+                        // guest katılımı: guestId henüz yok, katılan kişi
+                        || (resource.data.get('guestId', '') == ''
+                            && request.resource.data.get('guestId', '') == request.auth.uid))
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['phase', 'guestId', 'startedAt', 'hostDone', 'guestDone'])
+                    && request.resource.data.get('phase', resource.data.phase)
+                         in ['waiting', 'ready', 'playing', 'done']
+                    // guestId, bir kez yazıldıktan sonra değiştirilemez.
+                    && (resource.data.get('guestId', '') == ''
+                        || request.resource.data.get('guestId', resource.data.guestId)
+                           == resource.data.guestId);
+    }
+
+    // Kullanıcı kendi belgesini okuyabilir.
+    // isPro ve purchasedAt yalnızca Admin SDK (Cloud Function) tarafından yazılır —
+    // client bu alanları ne oluşturmada ne de güncellemede belirleyemez.
+    match /users/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && !request.resource.data.keys().hasAny(['isPro', 'purchasedAt']);
+
+      allow update: if request.auth != null
+                    && request.auth.uid == uid
+                    && !request.resource.data.diff(resource.data)
+                         .affectedKeys().hasAny(['isPro', 'purchasedAt']);
+    }
+
+    // Satın alma doğrulama istekleri: yalnızca oluşturma izni verilir,
+    // okuma/güncelleme/silme sadece Admin SDK yapar.
+    match /purchase_verifications/{docId} {
+      allow create: if request.auth != null
+                    && request.resource.data.uid == request.auth.uid
+                    && request.resource.data.keys().hasAll([
+                         'uid', 'purchaseToken', 'productId', 'requestedAt'
+                       ])
+                    && request.resource.data.verified == false;
+      allow read, update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
+

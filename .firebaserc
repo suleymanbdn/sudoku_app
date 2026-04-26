@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "zen-sudoku-no-ads",
+    "emulator": "demo-sudoku-duel"
+  }
+}

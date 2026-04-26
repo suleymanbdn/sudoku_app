@@ -1,0 +1,14 @@
+Play Console — Kod gösterme dosyası (mapping.txt) yükleme
+
+1. Her release AAB yükledikten sonra, AYNI derlemeden üretilen dosyayı kullan:
+   build\app\outputs\mapping\release\mapping.txt
+
+2. Play Console → Uygulamanız → Sürüm → ilgili sürüm →
+   "App bundle explorer" veya çökme raporları / dosya yükleme alanından
+   "Deobfuscation file" / "Native debug symbols" bölümüne mapping.txt ekleyebilirsin.
+   (Arayüz sürüme göre "Kod gösterme dosyası yükle" veya benzeri olabilir.)
+
+3. ÖNEMLİ: Her yeni sürüm (versionCode) için yeni AAB ile birlikte O sürüme ait mapping.txt yükle.
+   Eski mapping yeni sürümle eşleşmez.
+
+4. Projede R8 açık: android/app/build.gradle.kts içinde release için minify + proguard-rules.pro.

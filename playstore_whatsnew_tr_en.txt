@@ -1,0 +1,35 @@
+═══════════════════════════════════════════════════════════════
+TÜRKÇE — Play Console → Sürüm notları (Türkçe)
+Kopyala-yapıştır için aşağıdaki blok:
+═══════════════════════════════════════════════════════════════
+
+İlk sürüm (1.0.0): Klasik 9x9 Sudoku. Üç zorluk seviyesi, kalem notu modu ve ipucu sistemi. Süre sayacı, ilerleme ve oyun sonu istatistikleri. Skor özeti ve zorluk bazında en iyi süreler. Beş uyumlu renk teması. Duraklatma ve sade arayüz; reklamsız oyun.
+
+Güncelleme (1.0.5): Arayüz İngilizce. Tüm renk temaları dar ekranda görünür. Play güncellemeleri için güvenilir sürüm kodu. Uygulama adı: Sudoku Puzzle.
+
+═══════════════════════════════════════════════════════════════
+ENGLISH — Play Console → Release notes (English – United States or default)
+Copy-paste the block below:
+═══════════════════════════════════════════════════════════════
+
+First release (1.0.0): Classic 9x9 Sudoku. Three difficulty levels, notes mode, and hints. Timer, progress, and end-game stats. Score overview and best times per difficulty. Five cohesive color themes. Pause and a clean UI; ad-free gameplay.
+
+Update (1.0.5): English UI. All color themes visible on narrow screens. Reliable version code for Play updates. App name: Sudoku Puzzle.
+
+───────────────────────────────────────────────────────────────
+Update 1.0.5 — TR (kısa, ayrı kopyala)
+───────────────────────────────────────────────────────────────
+
+• Arayüz dili İngilizce
+• Ana ekranda tüm renk temaları dar ekranda da görünür (sarma düzeni)
+• Yükleme sürüm kodunun her zaman güncel olması (Play güncellemeleri için)
+• Uygulama adı: Sudoku Puzzle
+
+───────────────────────────────────────────────────────────────
+Update 1.0.5 — EN (short)
+───────────────────────────────────────────────────────────────
+
+• UI language: English
+• All color themes visible on small screens (wrapped layout)
+• Reliable version code for Play Store updates
+• App display name: Sudoku Puzzle

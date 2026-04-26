@@ -1,0 +1,25 @@
+Sudoku Puzzle — Sürüm 1.0.5
+
+• Arayüz dili İngilizce
+• Tüm renk temaları dar ekranda görünür
+• Play güncellemeleri için sürüm kodu iyileştirmesi
+• Uygulama adı: Sudoku Puzzle
+
+--- Önceki: 1.0.0 ---
+
+Sudoku Puzzle — Sürüm 1.0.0
+
+İlk sürüm! Klasik 9x9 Sudoku deneyimini telefonunda yaşa.
+
+• Kolay, orta ve zor seviyeler; her zorlukta farklı ipucu ve hata limitleri
+• Kalem notu modu ve ipucu sistemi
+• Süre sayacı, ilerleme ve oyun sonu istatistikleri
+• Skor özeti ve zorluk bazında en iyi süreler (oturum içi)
+• Beş uyumlu renk teması; seçimin cihazda hatırlanır
+• Duraklatma, temiz arayüz, reklamsız oyun akışı
+
+Keyifli oyunlar dileriz.
+
+--- Kısa sürüm (Play Console ~500 karakter sınırı için) ---
+
+İlk sürüm (1.0.0): Klasik 9x9 Sudoku. Üç zorluk, not modu, ipucu, süre ve ilerleme. Skor özeti. Beş renk teması. Duraklatma, sade arayüz, reklamsız.
