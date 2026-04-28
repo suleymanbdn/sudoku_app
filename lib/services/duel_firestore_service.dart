@@ -79,6 +79,18 @@ class DuelFirestoreService {
     });
   }
 
+  Future<void> reportForfeit({
+    required String roomCode,
+    required bool isHost,
+  }) async {
+    final db = _db;
+    if (db == null) return;
+    final field = isHost ? 'hostForfeit' : 'guestForfeit';
+    await db.collection('duel_matches').doc(roomCode).update({
+      field: true,
+    });
+  }
+
   Stream<DocumentSnapshot<Map<String, dynamic>>>? watchRoom(String roomCode) {
     final db = _db;
     if (db == null) return null;

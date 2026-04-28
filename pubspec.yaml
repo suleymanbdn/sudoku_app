@@ -2,7 +2,7 @@ name: sudoku
 description: "Classic 9x9 Sudoku with color themes, notes mode, and difficulty levels."
 publish_to: "none"
 
-version: 1.0.39+40
+version: 1.0.42+43
 
 environment:
   sdk: ^3.9.2
