@@ -65,6 +65,14 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   late final ConfettiController _confettiRight;
   bool _duelRaceOutcomeShown = false;
 
+  bool _countdownActive = false;
+  int _countdownValue = 3;
+  bool _countdownStarted = false;
+  Timer? _countdownTimer;
+  Timer? _duelOpponentTimeoutTimer;
+
+  static const _duelOpponentTimeout = Duration(minutes: 3);
+
   @override
   void initState() {
     super.initState();
@@ -72,13 +80,61 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         ConfettiController(duration: const Duration(seconds: 7));
     _confettiRight =
         ConfettiController(duration: const Duration(seconds: 7));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final game = ref.read(gameProvider);
+      if (game.isDuel &&
+          ref.read(gameStatusProvider) == GameStatus.playing &&
+          !_countdownStarted) {
+        _countdownStarted = true;
+        _startCountdown();
+      }
+    });
   }
 
   @override
   void dispose() {
     _confettiLeft.dispose();
     _confettiRight.dispose();
+    _countdownTimer?.cancel();
+    _duelOpponentTimeoutTimer?.cancel();
     super.dispose();
+  }
+
+  void _startDuelOpponentTimeout() {
+    _duelOpponentTimeoutTimer?.cancel();
+    _duelOpponentTimeoutTimer = Timer(_duelOpponentTimeout, () {
+      if (!mounted || _duelRaceOutcomeShown) return;
+      _duelRaceOutcomeShown = true;
+      _showDuelOpponentLeftDialog();
+    });
+  }
+
+  void _showDuelOpponentLeftDialog() {
+    final c = context.appColors;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Opponent left',
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          'Your opponent didn\'t finish within 3 minutes. You win by default!',
+          style: GoogleFonts.nunito(
+            fontSize: 14,
+            height: 1.35,
+            color: c.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
 
@@ -117,6 +173,28 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   }
 
 
+  void _startCountdown() {
+    setState(() {
+      _countdownActive = true;
+      _countdownValue = 3;
+    });
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() => _countdownValue--);
+      if (_countdownValue == 0) {
+        // "GO!" is now showing — start the timer so elapsed time is fair.
+        ref.read(gameProvider.notifier).startDuelTimer();
+      }
+      if (_countdownValue < 0) {
+        t.cancel();
+        setState(() => _countdownActive = false);
+      }
+    });
+  }
+
   void _showLostDialog() {
     showDialog<void>(
       context: context,
@@ -125,7 +203,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
     );
   }
 
-  void _showDuelRaceResult({required bool tie, required bool won}) {
+  void _showDuelRaceResult({
+    required bool tie,
+    required bool won,
+    bool opponentForfeit = false,
+  }) {
     final c = context.appColors;
     showDialog<void>(
       context: context,
@@ -142,7 +224,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           tie
               ? 'Same server finish time — call it a draw.'
               : won
-                  ? 'You completed the grid first with a correct solution.'
+                  ? opponentForfeit
+                      ? 'Your opponent ran out of mistakes — you win!'
+                      : 'You completed the grid first with a correct solution.'
                   : 'Your opponent reached the finish first this round.',
           style: GoogleFonts.nunito(
             fontSize: 14,
@@ -175,11 +259,31 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           if (snap == null || !snap.exists) return;
           final d = snap.data();
           if (d == null) return;
+          if (_duelRaceOutcomeShown) return;
+
+          final opponentForfeit = gameNow.duelIsHost
+              ? d['guestForfeit'] == true
+              : d['hostForfeit'] == true;
+          final myForfeit = gameNow.duelIsHost
+              ? d['hostForfeit'] == true
+              : d['guestForfeit'] == true;
+
+          if (opponentForfeit && !myForfeit) {
+            _duelRaceOutcomeShown = true;
+            _duelOpponentTimeoutTimer?.cancel();
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!mounted) return;
+              _showDuelRaceResult(
+                  tie: false, won: true, opponentForfeit: true);
+            });
+            return;
+          }
+
           final hostDone = d['hostDone'];
           final guestDone = d['guestDone'];
           if (hostDone is! Timestamp || guestDone is! Timestamp) return;
-          if (_duelRaceOutcomeShown) return;
           _duelRaceOutcomeShown = true;
+          _duelOpponentTimeoutTimer?.cancel();
           final cmp = hostDone.compareTo(guestDone);
           final tie = cmp == 0;
           final won =
@@ -250,6 +354,13 @@ class _GameScreenState extends ConsumerState<GameScreen> {
 
     ref.listen<GameStatus>(gameStatusProvider, (prev, next) {
       if (prev == next) return;
+      if (prev == GameStatus.generating && next == GameStatus.playing) {
+        final game = ref.read(gameProvider);
+        if (game.isDuel && !_countdownStarted) {
+          _countdownStarted = true;
+          _startCountdown();
+        }
+      }
       if (next == GameStatus.won) {
         final game = ref.read(gameProvider);
         if (game.isDuel && game.duelRoomCode != null) {
@@ -261,6 +372,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
                 isHost: game.duelIsHost,
               ),
             );
+            // Wait up to 3 minutes for the opponent to finish.
+            _startDuelOpponentTimeout();
           }
         }
         unawaited(
@@ -272,6 +385,18 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         );
         _celebrate();
       } else if (next == GameStatus.lost) {
+        final game = ref.read(gameProvider);
+        if (game.isDuel && game.duelRoomCode != null) {
+          final fs = ref.read(duelFirestoreServiceProvider);
+          if (fs.isReady) {
+            unawaited(
+              fs.reportForfeit(
+                roomCode: game.duelRoomCode!,
+                isHost: game.duelIsHost,
+              ),
+            );
+          }
+        }
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           _showLostDialog();
@@ -332,6 +457,8 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           alignment: Alignment.topRight,
           blastDirection: pi - pi / 2.6,
         ),
+        if (_countdownActive)
+          _DuelCountdownOverlay(value: _countdownValue),
       ],
     );
   }
@@ -418,7 +545,7 @@ class _SoundToggleButton extends ConsumerWidget {
       visualDensity: VisualDensity.compact,
       constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
       padding: EdgeInsets.zero,
-      tooltip: on ? 'Sesi kapat' : 'Sesi aç',
+      tooltip: on ? 'Mute' : 'Unmute',
       onPressed: () => ref.read(soundEnabledProvider.notifier).toggle(),
     );
   }
@@ -678,9 +805,9 @@ class _SudokuGridCells extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final game = ref.watch(gameProvider);
+    final snap = ref.watch(boardSnapshotProvider);
 
-    if (game.currentBoard.isEmpty) return const SizedBox.shrink();
+    if (snap.currentBoard.isEmpty) return const SizedBox.shrink();
 
     return GridView.builder(
       physics: const NeverScrollableScrollPhysics(),
@@ -696,7 +823,7 @@ class _SudokuGridCells extends ConsumerWidget {
         return _SudokuCell(
           row: row,
           col: col,
-          game: game,
+          snap: snap,
           onTap: () => ref.read(gameProvider.notifier).selectCell(row, col),
         );
       },
@@ -708,13 +835,13 @@ class _SudokuGridCells extends ConsumerWidget {
 class _SudokuCell extends StatefulWidget {
   final int row;
   final int col;
-  final GameState game;
+  final BoardSnapshot snap;
   final VoidCallback onTap;
 
   const _SudokuCell({
     required this.row,
     required this.col,
-    required this.game,
+    required this.snap,
     required this.onTap,
   });
 
@@ -765,12 +892,12 @@ class _SudokuCellState extends State<_SudokuCell>
   @override
   void didUpdateWidget(_SudokuCell old) {
     super.didUpdateWidget(old);
-    if (old.game.currentBoard.isNotEmpty &&
-        widget.game.currentBoard.isNotEmpty) {
-      final oldVal = old.game.currentBoard[widget.row][widget.col];
-      final newVal = widget.game.currentBoard[widget.row][widget.col];
+    if (old.snap.currentBoard.isNotEmpty &&
+        widget.snap.currentBoard.isNotEmpty) {
+      final oldVal = old.snap.currentBoard[widget.row][widget.col];
+      final newVal = widget.snap.currentBoard[widget.row][widget.col];
       final isErr =
-          widget.game.errorCells.contains('${widget.row},${widget.col}');
+          widget.snap.errorCells.contains('${widget.row},${widget.col}');
       if (oldVal == 0 && newVal != 0 && !isErr) {
         _scaleCtrl.forward(from: 0);
       }
@@ -786,31 +913,31 @@ class _SudokuCellState extends State<_SudokuCell>
   }
 
   bool get _isSelected =>
-      widget.game.selectedRow == widget.row &&
-      widget.game.selectedCol == widget.col;
+      widget.snap.selectedRow == widget.row &&
+      widget.snap.selectedCol == widget.col;
 
   bool get _isFixed =>
-      widget.game.isFixed.isNotEmpty &&
-      widget.game.isFixed[widget.row][widget.col];
+      widget.snap.isFixed.isNotEmpty &&
+      widget.snap.isFixed[widget.row][widget.col];
 
   bool get _isError =>
-      widget.game.errorCells.contains('${widget.row},${widget.col}');
+      widget.snap.errorCells.contains('${widget.row},${widget.col}');
 
-  int get _value => widget.game.currentBoard.isNotEmpty
-      ? widget.game.currentBoard[widget.row][widget.col]
+  int get _value => widget.snap.currentBoard.isNotEmpty
+      ? widget.snap.currentBoard[widget.row][widget.col]
       : 0;
 
-  Set<int> get _notes => widget.game.notes.isNotEmpty
-      ? widget.game.notes[widget.row][widget.col]
+  Set<int> get _notes => widget.snap.notes.isNotEmpty
+      ? widget.snap.notes[widget.row][widget.col]
       : const {};
 
   bool get _hasSelection =>
-      widget.game.selectedRow >= 0 && widget.game.selectedCol >= 0;
+      widget.snap.selectedRow >= 0 && widget.snap.selectedCol >= 0;
 
   bool get _isHighlighted {
     if (!_hasSelection) return false;
-    final sr = widget.game.selectedRow;
-    final sc = widget.game.selectedCol;
+    final sr = widget.snap.selectedRow;
+    final sc = widget.snap.selectedCol;
     return widget.row == sr ||
         widget.col == sc ||
         (widget.row ~/ 3 == sr ~/ 3 && widget.col ~/ 3 == sc ~/ 3);
@@ -818,10 +945,10 @@ class _SudokuCellState extends State<_SudokuCell>
 
   bool get _isSameNumber {
     if (!_hasSelection || _value == 0 || _isSelected) return false;
-    final sr = widget.game.selectedRow;
-    final sc = widget.game.selectedCol;
+    final sr = widget.snap.selectedRow;
+    final sc = widget.snap.selectedCol;
     if (sr < 0 || sc < 0) return false;
-    final selVal = widget.game.currentBoard[sr][sc];
+    final selVal = widget.snap.currentBoard[sr][sc];
     return selVal != 0 && selVal == _value;
   }
 
@@ -1331,6 +1458,71 @@ class _ActionIconButton extends StatelessWidget {
 }
 
 
+class _DuelCountdownOverlay extends StatefulWidget {
+  final int value;
+  const _DuelCountdownOverlay({required this.value});
+
+  @override
+  State<_DuelCountdownOverlay> createState() => _DuelCountdownOverlayState();
+}
+
+class _DuelCountdownOverlayState extends State<_DuelCountdownOverlay>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _scaleCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _scaleCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 500),
+    )..forward();
+  }
+
+  @override
+  void didUpdateWidget(_DuelCountdownOverlay old) {
+    super.didUpdateWidget(old);
+    if (old.value != widget.value) {
+      _scaleCtrl.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _scaleCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isGo = widget.value <= 0;
+    final label = isGo ? 'GO!' : '${widget.value}';
+
+    return AbsorbPointer(
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.55),
+        child: Center(
+          child: ScaleTransition(
+            scale: Tween<double>(begin: 1.6, end: 1.0).animate(
+              CurvedAnimation(parent: _scaleCtrl, curve: Curves.easeOut),
+            ),
+            child: Text(
+              label,
+              style: GoogleFonts.nunito(
+                fontSize: isGo ? 80 : 100,
+                fontWeight: FontWeight.w900,
+                color: isGo ? const Color(0xFF66BB6A) : Colors.white,
+                height: 1,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
 class _ConfettiCannon extends StatelessWidget {
   final ConfettiController controller;
   final AlignmentGeometry alignment;
@@ -1412,11 +1604,11 @@ class _CelebrationOverlay extends ConsumerWidget {
                     colors: c.titleShaderColors,
                   ).createShader(bounds),
                   child: Text(
-                    'Amazing!',
+                    game.isDuel ? 'You win!' : 'Amazing!',
                     style: GoogleFonts.dancingScript(
                       fontSize: 72,
                       fontWeight: FontWeight.w700,
-                      color: Colors.white, // ShaderMask bunu boyar
+                      color: Colors.white,
                       height: 1,
                     ),
                   ),
@@ -1425,7 +1617,9 @@ class _CelebrationOverlay extends ConsumerWidget {
                 const SizedBox(height: 12),
 
                 Text(
-                  'You completed the Sudoku perfectly ✨',
+                  game.isDuel
+                      ? 'You finished first! 🏆'
+                      : 'You completed the Sudoku perfectly ✨',
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     color: c.onSurfaceVariant,

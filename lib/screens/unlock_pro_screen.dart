@@ -30,7 +30,7 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
 
     if (!service.canPurchase) {
       setState(() => _errorMessage =
-          'Mağaza şu an kullanılamıyor. Lütfen tekrar deneyin.');
+          'Store unavailable right now. Please try again.');
       return;
     }
 
@@ -57,13 +57,13 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
       } else {
         setState(
           () => _errorMessage =
-              'Satın alma onaylanamadı. Lütfen tekrar deneyin.',
+              'Purchase could not be confirmed. Please try again.',
         );
       }
     } catch (e) {
       if (mounted) {
         setState(
-          () => _errorMessage = 'Satın alma başarısız. Lütfen tekrar deneyin.',
+          () => _errorMessage = 'Purchase failed. Please try again.',
         );
       }
     } finally {
@@ -96,12 +96,12 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
       } else {
         setState(
           () => _errorMessage =
-              'Google hesabı bağlandı. Daha önce satın alma bulunamadı.',
+              'Google account linked. No previous purchase found.',
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = 'Google girişi başarısız. Tekrar deneyin.');
+        setState(() => _errorMessage = 'Google sign-in failed. Please try again.');
       }
     } finally {
       if (mounted) setState(() => _googleLoading = false);
@@ -130,16 +130,22 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
     });
     try {
       await service.restorePurchases();
-      await Future<void>.delayed(const Duration(milliseconds: 1200));
+      final confirmed = await service.purchaseStream
+          .where((isPro) => isPro)
+          .first
+          .timeout(
+            const Duration(seconds: 30),
+            onTimeout: () => false,
+          );
       if (!mounted) return;
-      if (service.isPro) {
+      if (confirmed) {
         Navigator.of(context).pop(true);
       } else {
-        setState(() => _errorMessage = 'Önceki satın alma bulunamadı.');
+        setState(() => _errorMessage = 'No previous purchase found.');
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Geri yükleme başarısız. Tekrar deneyin.');
+        setState(() => _errorMessage = 'Restore failed. Please try again.');
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -197,7 +203,7 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
               ),
               const SizedBox(height: 28),
               Text(
-                'Pro\'yu Aç',
+                'Unlock Pro',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 30,
@@ -207,7 +213,7 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'Tek seferlik ödeme — abonelik yok, reklam yok.',
+                'One-time payment — no subscription, no ads.',
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 15,
@@ -217,19 +223,19 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
               const SizedBox(height: 32),
               _FeatureRow(
                 icon: Icons.psychology_rounded,
-                label: 'Hard seviyesi',
+                label: 'Hard difficulty',
                 c: c,
               ),
               const SizedBox(height: 12),
               _FeatureRow(
                 icon: Icons.auto_awesome_rounded,
-                label: 'Expert seviyesi',
+                label: 'Expert difficulty',
                 c: c,
               ),
               const SizedBox(height: 12),
               _FeatureRow(
                 icon: Icons.all_inclusive_rounded,
-                label: 'Gelecekteki tüm seviyeler',
+                label: 'All future difficulty levels',
                 c: c,
               ),
               const Spacer(),
@@ -258,14 +264,14 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
                     );
                   }
                   return _BuyButton(
-                    label: '$price ile Aç',
+                    label: 'Unlock for $price',
                     loading: _loading,
                     onTap: _buy,
                     c: c,
                   );
                 },
                 loading: () => _BuyButton(
-                  label: 'Fiyat yükleniyor…',
+                  label: 'Loading price…',
                   loading: true,
                   onTap: null,
                   c: c,
@@ -285,7 +291,7 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
               TextButton(
                 onPressed: _loading ? null : _restore,
                 child: Text(
-                  'Satın almayı geri yükle',
+                  'Restore purchase',
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     color: c.onSurfaceVariant,
@@ -417,13 +423,13 @@ class _StoreUnavailable extends StatelessWidget {
   String get _message {
     switch (storeStatus) {
       case StoreStatus.storeUnavailable:
-        return 'Play Store bağlantısı kurulamadı.\nİnternet bağlantınızı kontrol edin.';
+        return 'Could not connect to Play Store.\nCheck your internet connection.';
       case StoreStatus.productNotFound:
-        return 'Ürün Play Console\'da bulunamadı.\nÜrün kimliğinin "unlock_full_game" ve durumunun "Aktif" olduğunu kontrol edin.';
+        return 'Product not found in Play Console.\nEnsure the product ID is "unlock_full_game" and its status is Active.';
       case StoreStatus.queryError:
-        return 'Play Store sorgu hatası.\nUygulama Play Store\'dan yüklü olmalıdır.';
+        return 'Play Store query error.\nMake sure the app was installed from the Play Store.';
       default:
-        return 'Ürün bilgisi alınamadı.\nGoogle Play üzerinden yüklü olduğunuzdan emin olun.';
+        return 'Could not load product info.\nEnsure you installed the app via Google Play.';
     }
   }
 
@@ -497,7 +503,7 @@ class _StoreUnavailable extends StatelessWidget {
                   )
                 : Icon(Icons.refresh_rounded, color: c.primary),
             label: Text(
-              retrying ? 'Yükleniyor…' : 'Tekrar Dene',
+              retrying ? 'Loading…' : 'Try Again',
               style: GoogleFonts.nunito(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -547,8 +553,8 @@ class _GoogleSignInButton extends StatelessWidget {
             : const Icon(Icons.account_circle_outlined, size: 18),
         label: Text(
           loading
-              ? 'Giriş yapılıyor…'
-              : 'Google ile giriş yap ve premium\'u kurtar',
+              ? 'Signing in…'
+              : 'Sign in with Google to restore Pro',
           style: GoogleFonts.nunito(
             fontSize: 13,
             color: c.onSurfaceVariant,

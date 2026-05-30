@@ -33,7 +33,8 @@ service cloud.firestore {
                         || (resource.data.get('guestId', '') == ''
                             && request.resource.data.get('guestId', '') == request.auth.uid))
                     && request.resource.data.diff(resource.data).affectedKeys()
-                         .hasOnly(['phase', 'guestId', 'startedAt', 'hostDone', 'guestDone'])
+                         .hasOnly(['phase', 'guestId', 'startedAt', 'hostDone', 'guestDone',
+                                   'hostForfeit', 'guestForfeit'])
                     && request.resource.data.get('phase', resource.data.phase)
                          in ['waiting', 'ready', 'playing', 'done']
                     // guestId, bir kez yazıldıktan sonra değiştirilemez.

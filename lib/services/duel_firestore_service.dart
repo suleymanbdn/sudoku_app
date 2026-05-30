@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../firebase_bootstrap.dart';
 
+enum JoinResult { ok, notFound, alreadyStarted }
+
 /// Synced head-to-head race (Firestore). No-op when Firebase is not configured.
 class DuelFirestoreService {
   DuelFirestoreService();
@@ -30,31 +32,33 @@ class DuelFirestoreService {
     }, SetOptions(merge: true));
   }
 
-  Future<bool> joinOnlineRoom({
+  /// Returns a join result: [JoinResult.ok], [JoinResult.notFound],
+  /// or [JoinResult.alreadyStarted].
+  Future<JoinResult> joinOnlineRoom({
     required String roomCode,
     required String guestId,
   }) async {
     final db = _db;
-    if (db == null) return false;
+    if (db == null) return JoinResult.notFound;
     final ref = db.collection('duel_matches').doc(roomCode);
     try {
-      return await db.runTransaction<bool>((transaction) async {
+      return await db.runTransaction<JoinResult>((transaction) async {
         final snap = await transaction.get(ref);
-        if (!snap.exists) return false;
+        if (!snap.exists) return JoinResult.notFound;
         final phase = snap.data()?['phase'];
         final phaseStr = phase is String ? phase : '';
         if (phaseStr == 'playing') {
-          return false;
+          return JoinResult.alreadyStarted;
         }
         final patch = <String, dynamic>{'guestId': guestId};
         if (phaseStr == 'waiting') {
           patch['phase'] = 'ready';
         }
         transaction.update(ref, patch);
-        return true;
+        return JoinResult.ok;
       });
     } catch (_) {
-      return false;
+      return JoinResult.notFound;
     }
   }
 
@@ -76,6 +80,18 @@ class DuelFirestoreService {
     final field = isHost ? 'hostDone' : 'guestDone';
     await db.collection('duel_matches').doc(roomCode).update({
       field: FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> reportForfeit({
+    required String roomCode,
+    required bool isHost,
+  }) async {
+    final db = _db;
+    if (db == null) return;
+    final field = isHost ? 'hostForfeit' : 'guestForfeit';
+    await db.collection('duel_matches').doc(roomCode).update({
+      field: true,
     });
   }
 

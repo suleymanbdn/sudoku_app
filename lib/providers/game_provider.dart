@@ -52,8 +52,9 @@ class GameNotifier extends StateNotifier<GameState> {
   @override
   void dispose() {
     _saveDebounce?.cancel();
-    if (state.status == GameStatus.playing ||
-        state.status == GameStatus.paused) {
+    if (!state.isDuel &&
+        (state.status == GameStatus.playing ||
+            state.status == GameStatus.paused)) {
       unawaited(saveActiveGame(_prefs, state));
     }
     _timer?.cancel();
@@ -131,7 +132,15 @@ class GameNotifier extends StateNotifier<GameState> {
       duelIsHost: duelIsHost,
     );
 
-    _startTimer();
+    // Duel games delay timer start until the countdown overlay finishes.
+    if (!isDuel) _startTimer();
+  }
+
+  /// Called by GameScreen when the duel countdown reaches zero.
+  void startDuelTimer() {
+    if (state.isDuel && state.status == GameStatus.playing) {
+      _startTimer();
+    }
   }
 
   Future<void> resetGame() => startGame(state.difficulty);

@@ -30,6 +30,7 @@ Future<void> saveActiveGame(SharedPreferences prefs, GameState state) async {
       state.status != GameStatus.paused) {
     return;
   }
+  if (state.isDuel) return; // Duel games are not persisted — room may be gone on restart.
   if (state.solution.isEmpty || state.currentBoard.isEmpty) return;
   final raw = jsonEncode(_encode(state));
   await prefs.setString(kActiveGamePrefsKey, raw);

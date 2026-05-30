@@ -1229,7 +1229,7 @@ class _ProBanner extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'PRO\'ya Geç',
+                    'Go Pro',
                     style: GoogleFonts.nunito(
                       fontSize: 16,
                       fontWeight: FontWeight.w800,
@@ -1237,7 +1237,7 @@ class _ProBanner extends ConsumerWidget {
                     ),
                   ),
                   Text(
-                    'Hard & Expert seviyelerin kilidini aç — tek seferlik ödeme',
+                    'Unlock Hard & Expert — one-time payment, no subscription',
                     style: GoogleFonts.nunito(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1257,7 +1257,7 @@ class _ProBanner extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                'Satın Al',
+                'Buy',
                 style: GoogleFonts.nunito(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
@@ -1302,14 +1302,14 @@ class _AccountCardState extends ConsumerState<_AccountCard> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Premium başarıyla geri yüklendi!'),
+            content: Text('Premium restored successfully!'),
             backgroundColor: Colors.green,
           ),
         );
       } else {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Google hesabı bağlandı: ${user.email}')),
+          SnackBar(content: Text('Google account linked: ${user.email}')),
         );
       }
     } finally {
@@ -1321,17 +1321,16 @@ class _AccountCardState extends ConsumerState<_AccountCard> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Çıkış yap'),
-        content: const Text(
-            'Google hesabından çıkmak istediğinizden emin misiniz?'),
+        title: const Text('Sign out'),
+        content: const Text('Are you sure you want to sign out of your Google account?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('İptal'),
+            child: const Text('Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Çıkış yap'),
+            child: const Text('Sign out'),
           ),
         ],
       ),
@@ -1370,8 +1369,7 @@ class _AccountCardState extends ConsumerState<_AccountCard> {
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Hesabına giriş yapmadan verilerini kaybedebilirsin. '
-                    'Google hesabınla kaydet, her cihazda erişebilelsin.',
+                    'Sign in to keep your data safe across devices and restore Pro on new installs.',
                     style: GoogleFonts.nunito(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -1420,7 +1418,7 @@ class _AccountCardState extends ConsumerState<_AccountCard> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      isLinked ? 'Google Hesabı' : 'Hesabınla kaydet',
+                      isLinked ? 'Google Account' : 'Save with your account',
                       style: GoogleFonts.nunito(
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -1429,8 +1427,8 @@ class _AccountCardState extends ConsumerState<_AccountCard> {
                     ),
                     Text(
                       isLinked
-                          ? (email ?? 'Bağlandı')
-                          : 'Premium\'u yeni cihazlarda kurtar',
+                          ? (email ?? 'Connected')
+                          : 'Restore Pro on any new device',
                       style: GoogleFonts.nunito(
                         fontSize: 12,
                         color: c.onSurfaceVariant,
@@ -1452,7 +1450,7 @@ class _AccountCardState extends ConsumerState<_AccountCard> {
                 TextButton(
                   onPressed: _signOut,
                   child: Text(
-                    'Çıkış',
+                    'Sign out',
                     style: GoogleFonts.nunito(
                       fontSize: 13,
                       color: c.onSurfaceVariant,
@@ -1463,7 +1461,7 @@ class _AccountCardState extends ConsumerState<_AccountCard> {
                 TextButton(
                   onPressed: _signIn,
                   child: Text(
-                    'Bağla',
+                    'Link',
                     style: GoogleFonts.nunito(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
