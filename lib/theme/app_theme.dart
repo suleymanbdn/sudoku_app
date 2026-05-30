@@ -1,15 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'app_colors.dart';
+import 'neon_chrome.dart';
 
 /// Builds [ThemeData] from [AppColors].
 class AppTheme {
   AppTheme._();
 
-  static ThemeData themeData(AppColors c) {
+  static ThemeData themeData(AppColors c, {required bool neonChromeEnabled}) {
     final scheme = ColorScheme(
-      brightness: Brightness.light,
+      brightness: c.isDark ? Brightness.dark : Brightness.light,
       primary: c.primary,
       onPrimary: c.pureWhite,
       primaryContainer: c.container,
@@ -42,7 +44,7 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      extensions: [c],
+      extensions: [c, NeonChrome(enabled: neonChromeEnabled)],
       scaffoldBackgroundColor: c.surface,
       textTheme: GoogleFonts.nunitoTextTheme().copyWith(
         displayLarge: GoogleFonts.nunito(
@@ -147,6 +149,17 @@ class AppTheme {
         iconTheme: IconThemeData(color: c.primary),
         actionsIconTheme: IconThemeData(color: c.primary),
         surfaceTintColor: Colors.transparent,
+        systemOverlayStyle: c.isDark
+            ? SystemUiOverlayStyle.light.copyWith(
+                statusBarColor: Colors.transparent,
+                systemNavigationBarColor: c.pureWhite,
+                systemNavigationBarIconBrightness: Brightness.light,
+              )
+            : SystemUiOverlayStyle.dark.copyWith(
+                statusBarColor: Colors.transparent,
+                systemNavigationBarColor: c.pureWhite,
+                systemNavigationBarIconBrightness: Brightness.dark,
+              ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
@@ -291,24 +304,27 @@ class AppTheme {
             const TextStyle(fontWeight: FontWeight.w500, fontSize: 11),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: c.pureWhite,
-        indicatorColor: c.container,
+        backgroundColor: c.isDark
+            ? Color.alphaBlend(c.primary.withValues(alpha: 0.08), c.surface)
+            : c.pureWhite,
+        indicatorColor: c.primary.withValues(alpha: c.isDark ? 0.32 : 0.14),
         iconTheme: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
-            return IconThemeData(color: c.dark, size: 24);
+            return IconThemeData(color: c.primary, size: 24);
           }
-          return IconThemeData(color: c.onSurfaceVariant, size: 24);
+          return IconThemeData(
+              color: c.onSurfaceVariant.withValues(alpha: 0.6), size: 24);
         }),
         labelTextStyle: WidgetStateProperty.resolveWith((states) {
           if (states.contains(WidgetState.selected)) {
             return TextStyle(
-              color: c.dark,
+              color: c.primary,
               fontWeight: FontWeight.w700,
               fontSize: 12,
             );
           }
           return TextStyle(
-            color: c.onSurfaceVariant,
+            color: c.onSurfaceVariant.withValues(alpha: 0.6),
             fontWeight: FontWeight.w500,
             fontSize: 12,
           );

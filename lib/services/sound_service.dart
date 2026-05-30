@@ -60,20 +60,24 @@ class SoundService {
         _mixNotes([(150.0, 0, 0.09, 0.30), (115.0, 60, 0.12, 0.25)],
             type: _NoteType.bass),
       );
+      // Line complete: clean single rising crystal ding (E5 → G5 bell)
       _lineFile = await _write(
         dir,
         'snd_line.wav',
         _mixNotes(
-            [(_e5, 0, 0.30, 0.26), (_g5, 130, 0.38, 0.30)],
-            type: _NoteType.marimba),
+          [(_e5, 0, 0.28, 0.30), (_g5, 100, 0.35, 0.34)],
+          type: _NoteType.bell,
+        ),
       );
+      // Box complete: richer C-E-G arpeggio with slight reverb tail
       _boxFile = await _write(
         dir,
         'snd_box.wav',
         _mixNotes([
-          (_c5, 0, 0.45, 0.24),
-          (_e5, 110, 0.45, 0.26),
-          (_g5, 220, 0.52, 0.28),
+          (_c5, 0, 0.50, 0.26),
+          (_e5, 90, 0.50, 0.28),
+          (_g5, 180, 0.55, 0.32),
+          (_c6, 280, 0.42, 0.22),
         ], type: _NoteType.bell),
       );
       _winFile = await _write(
@@ -230,6 +234,16 @@ class SoundService {
   // -------------------------------------------------------------------------
 
   static Uint8List _normalize(List<double> buf, int sr) {
+    // ── Fade-out: 30 ms cosine ramp at end of buffer ────────────────────────
+    // Prevents audible hard-cutoff clicks when the exponential decay hasn't
+    // reached silence by the time the buffer ends.
+    final fadeLen = min(buf.length, (sr * 0.030).round());
+    for (int i = 0; i < fadeLen; i++) {
+      final t = i / fadeLen; // 0 → 1
+      // cos fade: 1.0 at t=0, 0.0 at t=1
+      buf[buf.length - fadeLen + i] *= 0.5 * (1.0 + cos(pi * t));
+    }
+
     final peak = buf.fold(0.0, (m, v) => max(m, v.abs()));
     final scale = peak > 1e-9 ? (0.88 / peak) * 32767.0 : 0.0;
     final samples = buf

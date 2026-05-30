@@ -19,6 +19,19 @@ final isSignedInWithGoogleProvider = Provider<bool>((ref) {
   return service.isSignedInWithGoogle;
 });
 
+/// True when the user is signed in with Apple.
+final isSignedInWithAppleProvider = Provider<bool>((ref) {
+  final service = ref.watch(authServiceProvider);
+  ref.watch(authStateProvider);
+  return service.isSignedInWithApple;
+});
+
+/// True when signed in with any social provider (Google or Apple).
+final isSignedInSocialProvider = Provider<bool>((ref) {
+  return ref.watch(isSignedInWithGoogleProvider) ||
+      ref.watch(isSignedInWithAppleProvider);
+});
+
 /// Display name of the signed-in Google user, or null.
 final googleDisplayNameProvider = Provider<String?>((ref) {
   ref.watch(authStateProvider);

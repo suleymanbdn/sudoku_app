@@ -36,7 +36,7 @@ final duelRoomDocStreamProvider = StreamProvider.autoDispose
   if (stream == null) {
     return Stream<DocumentSnapshot<Map<String, dynamic>>?>.value(null);
   }
-  return stream.map((s) => s);
+  return stream;
 });
 
 /// For online duels uses Firebase Auth UID (bound to Firestore security rules).

@@ -8,13 +8,21 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../duel/duel_room_code.dart';
-import '../firebase_bootstrap.dart';
 import '../game_logic/sudoku_engine.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/difficulty_label.dart';
 import '../providers/duel_provider.dart';
 import '../providers/game_provider.dart';
 import '../services/duel_firestore_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/neon_chrome.dart';
 import 'game_screen.dart';
+
+// ── Duel badge semantic colors ───────────────────────────────────────────────
+const _kBadgeHintsColor = Color(0xFFFFA000);
+const _kBadgePuzzleColor = Color(0xFF1976D2);
+const _kBadgeSyncColor = Color(0xFF388E3C);
+const _kBadgeOfflineColor = Color(0xFF757575);
 
 class DuelLobbyScreen extends ConsumerStatefulWidget {
   const DuelLobbyScreen({super.key});
@@ -121,8 +129,8 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
       } catch (_) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Could not connect to server. Check your internet connection.'),
+            SnackBar(
+              content: Text(AppLocalizations.of(context).duelConnectError),
             ),
           );
         }
@@ -160,8 +168,8 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not start the race. Check your connection.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).duelStartRaceError),
           ),
         );
       }
@@ -173,7 +181,9 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
     if (parsed == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid room code')),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).duelInvalidRoomCode),
+          ),
         );
       }
       return;
@@ -193,7 +203,9 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
     if (parsed == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Invalid room code')),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).duelInvalidRoomCode),
+          ),
         );
       }
       return;
@@ -210,8 +222,8 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not connect to server. Check your internet connection.'),
+          SnackBar(
+            content: Text(AppLocalizations.of(context).duelConnectError),
           ),
         );
       }
@@ -220,13 +232,17 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
     if (!mounted) return;
     if (result == JoinResult.alreadyStarted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Race already started — too late to join.')),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).duelRaceAlreadyStarted),
+        ),
       );
       return;
     }
     if (result == JoinResult.notFound) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Room not found. Check the code and try again.')),
+        SnackBar(
+          content: Text(AppLocalizations.of(context).duelRoomNotFound),
+        ),
       );
       return;
     }
@@ -248,6 +264,7 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final l = AppLocalizations.of(context);
     final firebaseOk = ref.watch(duelFirebaseReadyProvider);
     final onlineActive = _useOnline && firebaseOk;
 
@@ -271,7 +288,7 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
                 // ── Difficulty ────────────────────────────────────
                 _SectionLabel(
                   icon: Icons.tune_rounded,
-                  label: 'Difficulty',
+                  label: l.duelDifficulty,
                   c: c,
                 ),
                 const SizedBox(height: 10),
@@ -297,7 +314,7 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
                 // ── HOST ──────────────────────────────────────────
                 _SectionLabel(
                   icon: Icons.emoji_events_rounded,
-                  label: 'Host',
+                  label: l.duelHost,
                   c: c,
                 ),
                 const SizedBox(height: 10),
@@ -308,7 +325,9 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
                   onCopy: () {
                     Clipboard.setData(ClipboardData(text: _roomCode!));
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Code copied')),
+                      SnackBar(
+                        content: Text(AppLocalizations.of(context).duelCodeCopied),
+                      ),
                     );
                   },
                   onCancel: _resetRoom,
@@ -325,7 +344,7 @@ class _DuelLobbyScreenState extends ConsumerState<DuelLobbyScreen> {
                 // ── JOIN ──────────────────────────────────────────
                 _SectionLabel(
                   icon: Icons.login_rounded,
-                  label: 'Join',
+                  label: l.duelJoin,
                   c: c,
                 ),
                 const SizedBox(height: 10),
@@ -392,6 +411,7 @@ class _DuelHeroBannerState extends State<_DuelHeroBanner>
   @override
   Widget build(BuildContext context) {
     final topPadding = MediaQuery.of(context).padding.top;
+    final tc = context.appColors;
     return Container(
       height: 200 + topPadding,
       decoration: BoxDecoration(
@@ -400,7 +420,7 @@ class _DuelHeroBannerState extends State<_DuelHeroBanner>
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-      ),
+      ).withNeonIf(context, tc),
       child: Stack(
         children: [
           // Back button
@@ -449,7 +469,7 @@ class _DuelHeroBannerState extends State<_DuelHeroBanner>
                               color: Colors.white.withValues(alpha: 0.4),
                               width: 1.5,
                             ),
-                          ),
+                          ).withNeonIf(context, tc),
                           child: Text(
                             'VS',
                             style: GoogleFonts.nunito(
@@ -474,7 +494,7 @@ class _DuelHeroBannerState extends State<_DuelHeroBanner>
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    'DUEL RACE',
+                    AppLocalizations.of(context).duelRaceTitle,
                     style: GoogleFonts.nunito(
                       fontSize: 28,
                       fontWeight: FontWeight.w900,
@@ -484,7 +504,7 @@ class _DuelHeroBannerState extends State<_DuelHeroBanner>
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Same puzzle • First correct finish wins',
+                    AppLocalizations.of(context).duelRaceTagline,
                     style: GoogleFonts.nunito(
                       fontSize: 13,
                       color: Colors.white.withValues(alpha: 0.75),
@@ -511,25 +531,26 @@ class _FeatureBadgesRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         _FeatureBadge(
           icon: Icons.lightbulb_outline_rounded,
-          label: 'No Hints',
-          color: const Color(0xFFFFA000),
+          label: l.duelNoHints,
+          color: _kBadgeHintsColor,
         ),
         const SizedBox(width: 8),
         _FeatureBadge(
           icon: Icons.grid_view_rounded,
-          label: 'Same Puzzle',
-          color: const Color(0xFF1976D2),
+          label: l.duelSamePuzzle,
+          color: _kBadgePuzzleColor,
         ),
         const SizedBox(width: 8),
         _FeatureBadge(
           icon: liveSync ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-          label: liveSync ? 'Live Sync' : 'Offline',
-          color: liveSync ? const Color(0xFF388E3C) : const Color(0xFF757575),
+          label: liveSync ? l.duelLiveSync : l.duelOffline,
+          color: liveSync ? _kBadgeSyncColor : _kBadgeOfflineColor,
         ),
       ],
     );
@@ -548,13 +569,14 @@ class _FeatureBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final tc = context.appColors;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
+      ).withNeonIf(context, tc),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -625,17 +647,18 @@ class _DifficultyPicker extends StatelessWidget {
   });
 
   static const _data = [
-    (Difficulty.easy, Icons.eco_rounded, Color(0xFF43A047), 'Easy'),
-    (Difficulty.medium, Icons.bolt_rounded, Color(0xFFFB8C00), 'Medium'),
-    (Difficulty.hard, Icons.local_fire_department_rounded, Color(0xFFE53935), 'Hard'),
-    (Difficulty.expert, Icons.whatshot_rounded, Color(0xFF7B1FA2), 'Expert'),
+    (Difficulty.easy, Icons.eco_rounded, Color(0xFF43A047)),
+    (Difficulty.medium, Icons.bolt_rounded, Color(0xFFFB8C00)),
+    (Difficulty.hard, Icons.local_fire_department_rounded, Color(0xFFE53935)),
+    (Difficulty.expert, Icons.whatshot_rounded, Color(0xFF7B1FA2)),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Row(
       children: _data.map((entry) {
-        final (diff, icon, color, name) = entry;
+        final (diff, icon, color) = entry;
+        final name = diff.localizedLabel(context);
         final isSelected = selected == diff;
         return Expanded(
           child: Padding(
@@ -656,7 +679,7 @@ class _DifficultyPicker extends StatelessWidget {
                         : c.outline.withValues(alpha: 0.5),
                     width: isSelected ? 2 : 1,
                   ),
-                ),
+                ).withNeonIf(context, c),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -716,7 +739,7 @@ class _OnlineToggleCard extends StatelessWidget {
               ? c.primary.withValues(alpha: 0.4)
               : c.outline.withValues(alpha: 0.5),
         ),
-      ),
+      ).withNeonIf(context, c),
       child: SwitchListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
@@ -728,7 +751,7 @@ class _OnlineToggleCard extends StatelessWidget {
                 ? c.primary.withValues(alpha: 0.12)
                 : c.container,
             borderRadius: BorderRadius.circular(10),
-          ),
+          ).withNeonIf(context, c),
           child: Icon(
             Icons.wifi_rounded,
             size: 20,
@@ -736,7 +759,7 @@ class _OnlineToggleCard extends StatelessWidget {
           ),
         ),
         title: Text(
-          'Online Synced Start',
+          AppLocalizations.of(context).duelOnlineSyncedStart,
           style: GoogleFonts.nunito(
             fontWeight: FontWeight.w700,
             fontSize: 14,
@@ -744,7 +767,7 @@ class _OnlineToggleCard extends StatelessWidget {
           ),
         ),
         subtitle: Text(
-          'Host launches the race for both players simultaneously',
+          AppLocalizations.of(context).duelOnlineSyncedStartSubtitle,
           style: GoogleFonts.nunito(
             fontSize: 11,
             color: c.onSurfaceVariant,
@@ -784,6 +807,7 @@ class _HostCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -797,13 +821,13 @@ class _HostCard extends StatelessWidget {
             offset: const Offset(0, 2),
           ),
         ],
-      ),
+      ).withNeonIf(context, c),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (roomCode == null) ...[
             Text(
-              'Create a room and share the code with your opponent.',
+              l.duelCreateRoomHint,
               style: GoogleFonts.nunito(
                 fontSize: 13,
                 color: c.onSurfaceVariant,
@@ -814,7 +838,7 @@ class _HostCard extends StatelessWidget {
               onPressed: onCreateRoom,
               icon: const Icon(Icons.add_circle_outline_rounded, size: 18),
               label: Text(
-                'Create Room',
+                l.duelCreateRoom,
                 style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
               ),
             ),
@@ -831,7 +855,7 @@ class _HostCard extends StatelessWidget {
                 onPressed: onStartOnline,
                 icon: const Icon(Icons.rocket_launch_rounded, size: 18),
                 label: Text(
-                  'Start Race — Both Devices',
+                  l.duelStartRaceBoth,
                   style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
                 ),
               )
@@ -840,7 +864,7 @@ class _HostCard extends StatelessWidget {
                 onPressed: onStartOffline,
                 icon: const Icon(Icons.play_arrow_rounded, size: 18),
                 label: Text(
-                  'Start Puzzle (Offline)',
+                  l.duelStartPuzzleOffline,
                   style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
                 ),
               ),
@@ -881,7 +905,7 @@ class _RoomCodeDisplay extends StatelessWidget {
           color: c.primary.withValues(alpha: 0.45),
           width: 1.5,
         ),
-      ),
+      ).withNeonIf(context, c),
       child: Row(
         children: [
           Expanded(
@@ -889,7 +913,7 @@ class _RoomCodeDisplay extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'ROOM CODE',
+                  AppLocalizations.of(context).duelRoomCodeLabelCaps,
                   style: GoogleFonts.nunito(
                     fontSize: 9,
                     fontWeight: FontWeight.w800,
@@ -915,7 +939,7 @@ class _RoomCodeDisplay extends StatelessWidget {
             children: [
               IconButton(
                 icon: Icon(Icons.copy_rounded, size: 20, color: c.primary),
-                tooltip: 'Copy code',
+                tooltip: AppLocalizations.of(context).duelCopyCode,
                 onPressed: onCopy,
               ),
               IconButton(
@@ -924,7 +948,7 @@ class _RoomCodeDisplay extends StatelessWidget {
                   size: 20,
                   color: c.onSurfaceVariant,
                 ),
-                tooltip: 'Cancel room',
+                tooltip: AppLocalizations.of(context).duelCancelRoom,
                 onPressed: onCancel,
               ),
             ],
@@ -970,7 +994,7 @@ class _VsDivider extends StatelessWidget {
               border: Border.all(
                 color: c.primary.withValues(alpha: 0.3),
               ),
-            ),
+            ).withNeonIf(context, c),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -1049,7 +1073,7 @@ class _JoinCard extends StatelessWidget {
             offset: const Offset(0, 2),
           ),
         ],
-      ),
+      ).withNeonIf(context, c),
       child: guestWaiting
           ? _GuestWaitingContent(roomCode: roomCode ?? '', onLeave: onLeave, c: c)
           : _JoinFormContent(
@@ -1077,11 +1101,12 @@ class _JoinFormContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(
-          'Enter the room code shared by the host.',
+          l.duelJoinHint,
           style: GoogleFonts.nunito(
             fontSize: 13,
             color: c.onSurfaceVariant,
@@ -1103,7 +1128,7 @@ class _JoinFormContent extends StatelessWidget {
               letterSpacing: 2,
               color: Colors.grey.shade400,
             ),
-            labelText: 'Room code',
+            labelText: l.duelRoomCodeLabel,
             prefixIcon: const Icon(Icons.vpn_key_rounded),
           ),
         ),
@@ -1112,7 +1137,7 @@ class _JoinFormContent extends StatelessWidget {
           onPressed: onJoin,
           icon: const Icon(Icons.login_rounded, size: 18),
           label: Text(
-            onlineActive ? 'Join Race — Online' : 'Join Race',
+            onlineActive ? l.duelJoinRaceOnline : l.duelJoinRace,
             style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
           ),
         ),
@@ -1173,7 +1198,7 @@ class _GuestWaitingContentState extends State<_GuestWaitingContent>
               decoration: BoxDecoration(
                 color: c.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-              ),
+              ).withNeonIf(context, c),
               child: Icon(
                 Icons.hourglass_top_rounded,
                 color: c.primary,
@@ -1186,7 +1211,7 @@ class _GuestWaitingContentState extends State<_GuestWaitingContent>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Joined successfully!',
+                    AppLocalizations.of(context).duelJoinedSuccessfully,
                     style: GoogleFonts.nunito(
                       fontWeight: FontWeight.w700,
                       fontSize: 14,
@@ -1200,7 +1225,7 @@ class _GuestWaitingContentState extends State<_GuestWaitingContent>
                       child: child,
                     ),
                     child: Text(
-                      'Waiting for host to start the race…',
+                      AppLocalizations.of(context).duelWaitingForHost,
                       style: GoogleFonts.nunito(
                         fontSize: 12,
                         color: c.onSurfaceVariant,
@@ -1219,7 +1244,7 @@ class _GuestWaitingContentState extends State<_GuestWaitingContent>
             color: c.primary.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: c.primary.withValues(alpha: 0.3)),
-          ),
+          ).withNeonIf(context, c),
           child: Row(
             children: [
               Icon(Icons.tag_rounded, size: 14, color: c.primary),
@@ -1250,7 +1275,7 @@ class _GuestWaitingContentState extends State<_GuestWaitingContent>
           onPressed: widget.onLeave,
           icon: Icon(Icons.exit_to_app_rounded, size: 16, color: c.onSurfaceVariant),
           label: Text(
-            'Leave Room',
+            AppLocalizations.of(context).duelLeaveRoom,
             style: GoogleFonts.nunito(
               color: c.onSurfaceVariant,
               fontWeight: FontWeight.w600,

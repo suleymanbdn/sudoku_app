@@ -4,10 +4,21 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 
-import 'auth_service.dart';
+// ── Constants ────────────────────────────────────────────────────────────────
+/// Entitlement identifier (kept for API compatibility).
+const kProEntitlement = 'pro';
 
-const kProProductId = 'unlock_full_game';
-const _secureKey = 'is_pro_unlocked';
+/// Must match the product identifier in App Store / Play Store.
+const kProProductId = 'unlock_full_game_lifetime';
+
+/// Consumable hint pack — 10 hints for $0.99.
+const kHintPackProductId = 'hint_pack_10';
+
+/// Number of hints granted per hint pack purchase.
+const kHintPackCount = 10;
+
+/// Secure storage key for persisting pro status locally.
+const _kIsProKey = 'is_pro_iap_v1';
 
 enum StoreStatus {
   loading,
@@ -18,143 +29,254 @@ enum StoreStatus {
 }
 
 class PurchaseService {
-  PurchaseService({AuthService? authService}) : _authService = authService;
-
-  final AuthService? _authService;
-
-  static const _storage = FlutterSecureStorage(aOptions: AndroidOptions());
-
-  final InAppPurchase _iap = InAppPurchase.instance;
-  ProductDetails? _product;
-
   bool _isPro = false;
   bool _initialized = false;
   StoreStatus _storeStatus = StoreStatus.loading;
+  ProductDetails? _proProduct;
+  ProductDetails? _hintPackProduct;
   String? _lastError;
 
+  // Used to bridge the async purchase stream back to the buyPro() caller.
+  Completer<bool>? _buyCompleter;
+
+  StreamSubscription<List<PurchaseDetails>>? _purchaseSub;
+  final _proStreamCtrl = StreamController<bool>.broadcast();
+  final _hintPackStreamCtrl = StreamController<int>.broadcast();
+  final _storage = const FlutterSecureStorage();
+
   bool get isPro => _isPro;
-  String? get productPrice => _product?.price;
-  bool get canPurchase => _product != null;
+  String? get productPrice => _proProduct?.price;
+  String? get hintPackPrice => _hintPackProduct?.price;
+  bool get canPurchase => _proProduct != null;
+  bool get canPurchaseHintPack => _hintPackProduct != null;
   StoreStatus get storeStatus => _storeStatus;
   String? get lastError => _lastError;
 
-  late final Stream<bool> purchaseStream = _iap.purchaseStream
-      .asyncMap((updates) async {
-        await _handleUpdates(updates);
-        return _isPro;
-      })
-      .asBroadcastStream();
+  /// Emits the current `isPro` value whenever it changes.
+  Stream<bool> get purchaseStream => _proStreamCtrl.stream;
 
-  StreamSubscription<bool>? _keepAlive;
+  /// Emits the number of coins to add after a hint pack purchase.
+  Stream<int> get hintPackStream => _hintPackStreamCtrl.stream;
 
-  /// Safe to call multiple times. Pass [force]=true to re-query the store.
+  // ── Initialization ──────────────────────────────────────────────────────────
+
   Future<void> initialize({bool force = false}) async {
     if (_initialized && !force) return;
     _initialized = true;
-    _storeStatus = StoreStatus.loading;
     _lastError = null;
+    _storeStatus = StoreStatus.loading;
 
-    // 1. Local cache
-    final stored = await _storage.read(key: _secureKey);
-    _isPro = stored == 'true';
-
-    // 2. Cloud backup — if signed in with Google and not already pro
-    if (!_isPro && _authService != null) {
-      final cloudPro = await _authService.fetchProFromCloud();
-      if (cloudPro) {
-        _isPro = true;
-        await _storage.write(key: _secureKey, value: 'true');
-        if (kDebugMode) debugPrint('PurchaseService: isPro restored from Firestore');
-      }
+    // Restore persisted pro status instantly (no network).
+    final stored = await _storage.read(key: _kIsProKey);
+    if (stored == 'true' && !_isPro) {
+      _isPro = true;
+      _proStreamCtrl.add(true);
     }
 
-    _keepAlive ??= purchaseStream.listen((_) {});
-
-    final available = await _iap.isAvailable();
+    // Check if the store is reachable.
+    final available = await InAppPurchase.instance.isAvailable();
     if (!available) {
       _storeStatus = StoreStatus.storeUnavailable;
-      _lastError = 'Play Store kullanılamıyor (isAvailable=false)';
-      if (kDebugMode) debugPrint('IAP: $_lastError');
+      _lastError = 'Store not available';
+      if (kDebugMode) debugPrint('PurchaseService: store unavailable');
       return;
     }
 
-    for (var attempt = 1; attempt <= 3; attempt++) {
-      final response = await _iap.queryProductDetails({kProProductId});
+    // Subscribe to purchase updates (purchases, restores, errors, cancels).
+    await _purchaseSub?.cancel();
+    _purchaseSub = InAppPurchase.instance.purchaseStream.listen(
+      _onPurchaseUpdate,
+      onError: (Object e) {
+        if (kDebugMode) debugPrint('PurchaseService: stream error — $e');
+      },
+    );
 
-      if (response.error != null) {
-        _lastError = 'Sorgu hatası: ${response.error}';
-        if (kDebugMode) debugPrint('IAP attempt $attempt — $_lastError');
+    await _loadProduct();
+  }
+
+  Future<void> _loadProduct() async {
+    try {
+      final resp = await InAppPurchase.instance
+          .queryProductDetails({kProProductId, kHintPackProductId});
+
+      if (resp.error != null) {
         _storeStatus = StoreStatus.queryError;
-      }
-
-      if (response.notFoundIDs.isNotEmpty) {
-        _lastError = 'Ürün bulunamadı: ${response.notFoundIDs}';
-        if (kDebugMode) debugPrint('IAP attempt $attempt — $_lastError');
-        _storeStatus = StoreStatus.productNotFound;
-      }
-
-      if (response.productDetails.isNotEmpty) {
-        _product = response.productDetails.first;
-        _storeStatus = StoreStatus.ready;
-        _lastError = null;
-        if (kDebugMode) debugPrint('IAP: ürün yüklendi ($attempt. deneme)');
+        _lastError = resp.error!.message;
+        if (kDebugMode) debugPrint('PurchaseService: query error — $_lastError');
         return;
       }
 
-      if (attempt < 3) {
-        await Future<void>.delayed(Duration(seconds: attempt * 2));
+      for (final p in resp.productDetails) {
+        if (p.id == kProProductId) _proProduct = p;
+        if (p.id == kHintPackProductId) _hintPackProduct = p;
       }
+
+      if (_proProduct == null) {
+        _storeStatus = StoreStatus.productNotFound;
+        _lastError = 'Product not found: $kProProductId';
+        if (kDebugMode) debugPrint('PurchaseService: $_lastError');
+        return;
+      }
+
+      _storeStatus = StoreStatus.ready;
+      _lastError = null;
+      if (kDebugMode) {
+        debugPrint(
+          'PurchaseService: pro=${_proProduct!.price} '
+          'hintPack=${_hintPackProduct?.price ?? "not found"}',
+        );
+      }
+    } catch (e) {
+      _storeStatus = StoreStatus.queryError;
+      _lastError = e.toString();
+      if (kDebugMode) debugPrint('PurchaseService: _loadProduct failed — $e');
     }
   }
 
+  // ── Purchase stream handling ─────────────────────────────────────────────────
+
+  void _onPurchaseUpdate(List<PurchaseDetails> purchases) {
+    for (final purchase in purchases) {
+      _handlePurchase(purchase);
+    }
+  }
+
+  Future<void> _handlePurchase(PurchaseDetails purchase) async {
+    if (purchase.productID != kProProductId &&
+        purchase.productID != kHintPackProductId) {
+      return;
+    }
+
+    switch (purchase.status) {
+      case PurchaseStatus.purchased:
+      case PurchaseStatus.restored:
+        if (purchase.productID == kProProductId) {
+          await _setPro(true);
+          if (!(_buyCompleter?.isCompleted ?? true)) {
+            _buyCompleter!.complete(true);
+          }
+        } else if (purchase.productID == kHintPackProductId) {
+          _hintPackStreamCtrl.add(kHintPackCount);
+          if (!(_buyCompleter?.isCompleted ?? true)) {
+            _buyCompleter!.complete(true);
+          }
+        }
+
+      case PurchaseStatus.canceled:
+        if (!(_buyCompleter?.isCompleted ?? true)) {
+          _buyCompleter!.complete(false);
+        }
+
+      case PurchaseStatus.error:
+        final err = purchase.error?.message ?? 'Purchase failed';
+        if (kDebugMode) debugPrint('PurchaseService: purchase error — $err');
+        if (!(_buyCompleter?.isCompleted ?? true)) {
+          _buyCompleter!.completeError(Exception(err));
+        }
+
+      case PurchaseStatus.pending:
+        if (kDebugMode) debugPrint('PurchaseService: purchase pending');
+    }
+
+    // Always acknowledge / complete the transaction with StoreKit / Google Play.
+    if (purchase.pendingCompletePurchase) {
+      await InAppPurchase.instance.completePurchase(purchase);
+    }
+  }
+
+  Future<void> _setPro(bool value) async {
+    _isPro = value;
+    _proStreamCtrl.add(value);
+    await _storage.write(key: _kIsProKey, value: value.toString());
+  }
+
+  // ── Purchase actions ────────────────────────────────────────────────────────
+
   Future<void> retryLoadProduct() async {
-    _product = null;
+    _proProduct = null;
     _initialized = false;
     await initialize(force: true);
   }
 
+  /// Initiates a purchase. Awaits until the StoreKit/Play dialog resolves.
+  /// Returns normally on success or cancel; throws on error.
   Future<void> buyPro() async {
-    if (_product == null) return;
-    await _iap.buyNonConsumable(
-      purchaseParam: PurchaseParam(productDetails: _product!),
-    );
-  }
+    if (_proProduct == null) {
+      throw Exception('Product not loaded');
+    }
 
-  Future<void> restorePurchases() async {
-    await _iap.restorePurchases();
-  }
+    _buyCompleter = Completer<bool>();
 
-  Future<void> _handleUpdates(List<PurchaseDetails> purchases) async {
-    for (final p in purchases) {
-      if (p.productID != kProProductId) continue;
+    try {
+      final param = PurchaseParam(productDetails: _proProduct!);
+      final initiated =
+          await InAppPurchase.instance.buyNonConsumable(purchaseParam: param);
 
-      if (p.status == PurchaseStatus.purchased ||
-          p.status == PurchaseStatus.restored) {
-        _isPro = true;
-        await _storage.write(key: _secureKey, value: 'true');
-
-        // Notify server to verify purchase via Play Developer API.
-        // Server writes isPro to Firestore after verification.
-        if (p.verificationData.serverVerificationData.isNotEmpty) {
-          await _authService?.notifyPurchaseToServer(
-            purchaseToken: p.verificationData.serverVerificationData,
-            productId: p.productID,
-          );
-        }
-        if (kDebugMode) debugPrint('PurchaseService: isPro saved locally');
+      if (!initiated) {
+        _buyCompleter!.complete(false);
       }
 
-      if (p.status == PurchaseStatus.error) {
-        if (kDebugMode) debugPrint('IAP purchase error: ${p.error}');
+      // Wait for the purchase stream to resolve the Completer.
+      await _buyCompleter!.future;
+    } catch (e) {
+      if (!(_buyCompleter?.isCompleted ?? true)) {
+        _buyCompleter!.completeError(e);
       }
-
-      if (p.pendingCompletePurchase) {
-        await _iap.completePurchase(p);
-      }
+      rethrow;
+    } finally {
+      _buyCompleter = null;
     }
   }
 
+  /// Purchases a hint pack (consumable).
+  /// Returns `true` if coins were successfully granted, `false` if the user
+  /// cancelled or the purchase could not be initiated. Throws on error.
+  Future<bool> buyHintPack() async {
+    if (_hintPackProduct == null) {
+      throw Exception('Hint pack product not loaded');
+    }
+
+    _buyCompleter = Completer<bool>();
+
+    try {
+      final param = PurchaseParam(productDetails: _hintPackProduct!);
+      final initiated =
+          await InAppPurchase.instance.buyConsumable(purchaseParam: param);
+
+      if (!initiated) {
+        _buyCompleter!.complete(false);
+      }
+
+      // Returns true only when _handlePurchase confirms PurchaseStatus.purchased.
+      return await _buyCompleter!.future;
+    } catch (e) {
+      if (!(_buyCompleter?.isCompleted ?? true)) {
+        _buyCompleter!.completeError(e);
+      }
+      rethrow;
+    } finally {
+      _buyCompleter = null;
+    }
+  }
+
+  Future<void> restorePurchases() async {
+    await InAppPurchase.instance.restorePurchases();
+    // Results arrive via purchaseStream → _handlePurchase → _setPro.
+  }
+
+  // ── Account linking (no-ops — RevenueCat removed) ───────────────────────────
+
+  /// No-op: kept for API compatibility.
+  Future<void> loginUser(String userId) async {}
+
+  /// No-op: kept for API compatibility.
+  Future<void> logoutUser() async {}
+
+  // ── Cleanup ──────────────────────────────────────────────────────────────────
+
   void dispose() {
-    _keepAlive?.cancel();
+    _purchaseSub?.cancel();
+    _proStreamCtrl.close();
+    _hintPackStreamCtrl.close();
   }
 }

@@ -63,6 +63,8 @@ Map<String, dynamic> _encode(GameState s) => {
       'isDuel': s.isDuel,
       'duelRoomCode': s.duelRoomCode,
       'duelIsHost': s.duelIsHost,
+      'isDailyChallenge': s.isDailyChallenge,
+      'extraLifeUsed': s.extraLifeUsed,
     };
 
 GameState? _decode(Map<String, dynamic> j) {
@@ -164,6 +166,9 @@ GameState? _decode(Map<String, dynamic> j) {
   final duelCode = j['duelRoomCode'];
   final String? room = duelCode is String ? duelCode : null;
 
+  final isDaily = j['isDailyChallenge'] as bool? ?? false;
+  final extraLifeUsed = j['extraLifeUsed'] as bool? ?? false;
+
   return GameState(
     difficulty: Difficulty.values[d],
     solution: solution,
@@ -182,5 +187,7 @@ GameState? _decode(Map<String, dynamic> j) {
     isDuel: isDuel,
     duelRoomCode: room,
     duelIsHost: duelHost,
+    isDailyChallenge: isDaily,
+    extraLifeUsed: extraLifeUsed,
   );
 }

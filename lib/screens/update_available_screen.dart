@@ -5,8 +5,10 @@ import 'package:in_app_update/in_app_update.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../config/store_links.dart';
+import '../l10n/app_localizations.dart';
 import '../providers/app_update_provider.dart';
 import '../theme/app_colors.dart';
+import '../theme/neon_chrome.dart';
 
 /// Shown when Google Play reports a newer version than the installed build.
 class UpdateAvailableScreen extends ConsumerStatefulWidget {
@@ -64,6 +66,7 @@ class _UpdateAvailableScreenState extends ConsumerState<UpdateAvailableScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final l = AppLocalizations.of(context);
     final vc = widget.updateInfo.availableVersionCode;
 
     return Scaffold(
@@ -78,7 +81,7 @@ class _UpdateAvailableScreenState extends ConsumerState<UpdateAvailableScreen> {
                 child: IconButton(
                   onPressed: _busy ? null : _onLater,
                   icon: Icon(Icons.close_rounded, color: c.onSurfaceVariant),
-                  tooltip: 'Later',
+                  tooltip: l.updateAvailableLater,
                 ),
               ),
               const Spacer(flex: 1),
@@ -94,7 +97,7 @@ class _UpdateAvailableScreenState extends ConsumerState<UpdateAvailableScreen> {
                       offset: const Offset(0, 6),
                     ),
                   ],
-                ),
+                ).withNeonIf(context, c),
                 child: Icon(
                   Icons.system_update_rounded,
                   size: 56,
@@ -103,7 +106,7 @@ class _UpdateAvailableScreenState extends ConsumerState<UpdateAvailableScreen> {
               ),
               const SizedBox(height: 28),
               Text(
-                'Update available',
+                l.updateAvailableTitle,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 26,
@@ -114,8 +117,8 @@ class _UpdateAvailableScreenState extends ConsumerState<UpdateAvailableScreen> {
               const SizedBox(height: 12),
               Text(
                 vc != null
-                    ? 'A newer version is ready on Google Play (build $vc). Update for the latest fixes and improvements.'
-                    : 'A newer version is ready on Google Play. Update for the latest fixes and improvements.',
+                    ? l.updateAvailableBodyBuild(vc)
+                    : l.updateAvailableBody,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 15,
@@ -147,7 +150,7 @@ class _UpdateAvailableScreenState extends ConsumerState<UpdateAvailableScreen> {
                           ),
                         )
                       : Text(
-                          'Update now',
+                          l.updateNow,
                           style: GoogleFonts.nunito(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
@@ -159,7 +162,7 @@ class _UpdateAvailableScreenState extends ConsumerState<UpdateAvailableScreen> {
               TextButton(
                 onPressed: _busy ? null : _onLater,
                 child: Text(
-                  'Not now',
+                  l.notNow,
                   style: GoogleFonts.nunito(
                     fontWeight: FontWeight.w700,
                     color: c.onSurfaceVariant,

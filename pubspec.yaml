@@ -2,7 +2,7 @@ name: sudoku
 description: "Classic 9x9 Sudoku with color themes, notes mode, and difficulty levels."
 publish_to: "none"
 
-version: 1.0.42+43
+version: 1.2.0+66
 
 environment:
   sdk: ^3.9.2
@@ -10,6 +10,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  intl: any
   google_fonts: ^6.2.1
   flutter_riverpod: ^2.6.1
   confetti: ^0.8.0
@@ -19,13 +22,17 @@ dependencies:
   firebase_core: ^3.8.1
   cloud_firestore: ^5.6.0
   uuid: ^4.5.1
-  in_app_purchase: ^3.2.3
+  in_app_purchase: ^3.2.0
   firebase_auth: ^5.7.0
   flutter_secure_storage: ^10.0.0
   firebase_app_check: ^0.3.2+10
   google_sign_in: ^6.2.2
+  sign_in_with_apple: ^6.1.3
+  crypto: ^3.0.6
   audioplayers: ^6.1.0
   path_provider: ^2.1.5
+  flutter_native_splash: ^2.4.3
+  google_mobile_ads: ^5.1.0
 
 dev_dependencies:
   flutter_test:
@@ -35,11 +42,34 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  generate: true
+  assets:
+    - branding/app_icon.png
+
+flutter_native_splash:
+  color: "#05080F"
+  image: branding/app_icon.png
+  color_dark: "#05080F"
+  image_dark: branding/app_icon.png
+  android_12:
+    color: "#05080F"
+    image: branding/app_icon.png
+    color_dark: "#05080F"
+    image_dark: branding/app_icon.png
+  ios: true
+  android: true
+  web: false
+  fullscreen: false
 
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: branding/app_icon.png
   min_sdk_android: 21
-  adaptive_icon_background: "#2A1A45"
+  # Logo: black grid on white — match adaptive background to avoid a dark ring crop.
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: branding/app_icon.png
+  # Larger inset = logo sits inside the mask with more padding — avoids harsh corner
+  # clipping on adaptive icons (squircle) and reads as softer / rounder on the home screen.
+  adaptive_icon_foreground_inset: 20
+  remove_alpha_ios: true

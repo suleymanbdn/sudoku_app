@@ -29,8 +29,10 @@ enum Difficulty {
 
   /// Hints in solo play (duel always uses 0).
   int get soloHintsAllowed => switch (this) {
-        Difficulty.expert => 1,
-        _ => 3,
+        Difficulty.easy => 2,
+        Difficulty.medium => 1,
+        Difficulty.hard => 1,
+        Difficulty.expert => 0,
       };
 }
 

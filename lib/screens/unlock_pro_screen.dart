@@ -1,11 +1,17 @@
+import 'dart:io';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
+import '../l10n/app_localizations.dart';
 import '../providers/auth_provider.dart';
 import '../providers/purchase_provider.dart';
 import '../services/purchase_service.dart';
 import '../theme/app_colors.dart';
+import '../user_facing_messages.dart';
 
 class UnlockProScreen extends ConsumerStatefulWidget {
   const UnlockProScreen({super.key});
@@ -23,14 +29,22 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
   bool _loading = false;
   bool _retrying = false;
   bool _googleLoading = false;
+  bool _appleLoading = false;
   String? _errorMessage;
+
+  /// Premium unlocked — refresh provider and close screen.
+  void _closeAsPurchased() {
+    ref.invalidate(isProProvider);
+    if (!mounted) return;
+    Navigator.of(context).pop(true);
+  }
 
   Future<void> _buy() async {
     final service = ref.read(purchaseServiceProvider);
 
     if (!service.canPurchase) {
       setState(() => _errorMessage =
-          'Store unavailable right now. Please try again.');
+          AppLocalizations.of(context).storeUnavailable);
       return;
     }
 
@@ -42,28 +56,19 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
     try {
       await service.buyPro();
 
-      // Satın alma akışından onay gelene kadar bekle (max 60 sn).
-      final confirmed = await service.purchaseStream
-          .where((isPro) => isPro)
-          .first
-          .timeout(
-            const Duration(seconds: 60),
-            onTimeout: () => false,
-          );
-
       if (!mounted) return;
-      if (confirmed) {
-        Navigator.of(context).pop(true);
+      if (service.isPro) {
+        _closeAsPurchased();
       } else {
         setState(
           () => _errorMessage =
-              'Purchase could not be confirmed. Please try again.',
+              AppLocalizations.of(context).purchaseNotConfirmed,
         );
       }
     } catch (e) {
       if (mounted) {
         setState(
-          () => _errorMessage = 'Purchase failed. Please try again.',
+          () => _errorMessage = AppLocalizations.of(context).purchaseFailed,
         );
       }
     } finally {
@@ -80,31 +85,63 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
       final authService = ref.read(authServiceProvider);
       final user = await authService.signInWithGoogle();
       if (!mounted) return;
-      if (user == null) return; // kullanıcı iptal etti
+      if (user == null) return; // user canceled
 
-      // Firestore'da kayıtlı pro var mı kontrol et
-      final cloudPro = await authService.fetchProFromCloud();
+      // no-op: loginUser kept for API compatibility
+      final purchaseService = ref.read(purchaseServiceProvider);
+      await purchaseService.loginUser(user.uid);
       if (!mounted) return;
 
-      if (cloudPro) {
-        // Pro bulundu → local cache güncelle ve ekranı kapat
-        final purchaseService = ref.read(purchaseServiceProvider);
-        await purchaseService.initialize(force: true);
+      if (purchaseService.isPro) {
         ref.invalidate(isProProvider);
-        if (!mounted) return;
-        Navigator.of(context).pop(true);
+        _closeAsPurchased();
       } else {
-        setState(
-          () => _errorMessage =
-              'Google account linked. No previous purchase found.',
-        );
+        // Signed in, but no prior purchase found — new user signing in
+        // for the first time. Stay on screen so they can purchase.
+        ref.invalidate(isProProvider);
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _errorMessage = 'Google sign-in failed. Please try again.');
+        setState(() => _errorMessage =
+            googleSignInErrorForUser(AppLocalizations.of(context), e));
       }
     } finally {
       if (mounted) setState(() => _googleLoading = false);
+    }
+  }
+
+  Future<void> _signInWithApple() async {
+    setState(() {
+      _appleLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final authService = ref.read(authServiceProvider);
+      final user = await authService.signInWithApple();
+      if (!mounted) return;
+      if (user == null) return; // user canceled
+
+      // no-op: loginUser kept for API compatibility
+      final purchaseService = ref.read(purchaseServiceProvider);
+      await purchaseService.loginUser(user.uid);
+      if (!mounted) return;
+
+      if (purchaseService.isPro) {
+        ref.invalidate(isProProvider);
+        _closeAsPurchased();
+      } else {
+        // Signed in, but no prior purchase found — new user signing in
+        // for the first time. Stay on screen so they can purchase.
+        ref.invalidate(isProProvider);
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('_signInWithApple error: $e');
+      if (mounted) {
+        setState(() =>
+            _errorMessage = AppLocalizations.of(context).appleSignInFailed);
+      }
+    } finally {
+      if (mounted) setState(() => _appleLoading = false);
     }
   }
 
@@ -124,28 +161,59 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
 
   Future<void> _restore() async {
     final service = ref.read(purchaseServiceProvider);
+    final authService = ref.read(authServiceProvider);
+
+    /// If Pro exists in Firestore, sync to local cache (even without a Play purchase).
+    Future<bool> unlockFromCloud() async {
+      if (!await authService.fetchProFromCloud()) return false;
+      await service.initialize(force: true);
+      return service.isPro;
+    }
+
     setState(() {
       _loading = true;
       _errorMessage = null;
     });
     try {
       await service.restorePurchases();
-      final confirmed = await service.purchaseStream
-          .where((isPro) => isPro)
-          .first
-          .timeout(
-            const Duration(seconds: 30),
-            onTimeout: () => false,
-          );
+
+      if (service.isPro) {
+        _closeAsPurchased();
+        return;
+      }
+
+      if (await unlockFromCloud()) {
+        _closeAsPurchased();
+        return;
+      }
+
+      // Play restore updates often arrive late via purchaseStream on many devices.
+      var confirmed = false;
+      try {
+        confirmed = await service.purchaseStream
+            .where((isPro) => isPro)
+            .first
+            .timeout(const Duration(seconds: 45));
+      } catch (_) {
+        confirmed = service.isPro;
+      }
+
+      if (!confirmed) {
+        await service.initialize(force: true);
+        confirmed = service.isPro;
+      }
+
       if (!mounted) return;
       if (confirmed) {
-        Navigator.of(context).pop(true);
+        _closeAsPurchased();
       } else {
-        setState(() => _errorMessage = 'No previous purchase found.');
+        setState(() => _errorMessage =
+            proRestoreNotFoundForUser(AppLocalizations.of(context)));
       }
     } catch (_) {
       if (mounted) {
-        setState(() => _errorMessage = 'Restore failed. Please try again.');
+        setState(
+            () => _errorMessage = AppLocalizations.of(context).restoreFailed);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -155,8 +223,9 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final l = AppLocalizations.of(context);
     final priceAsync = ref.watch(productPriceProvider);
-    final isGoogleLinked = ref.watch(isSignedInWithGoogleProvider);
+    final isSocialLinked = ref.watch(isSignedInSocialProvider);
 
     return Scaffold(
       backgroundColor: c.surface,
@@ -203,7 +272,7 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
               ),
               const SizedBox(height: 28),
               Text(
-                'Unlock Pro',
+                l.unlockProTitle,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 30,
@@ -213,7 +282,7 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
               ),
               const SizedBox(height: 12),
               Text(
-                'One-time payment — no subscription, no ads.',
+                l.unlockProSubtitle,
                 textAlign: TextAlign.center,
                 style: GoogleFonts.nunito(
                   fontSize: 15,
@@ -222,21 +291,29 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
               ),
               const SizedBox(height: 32),
               _FeatureRow(
-                icon: Icons.psychology_rounded,
-                label: 'Hard difficulty',
+                icon: Icons.lightbulb_rounded,
+                label: l.featureUnlimitedHints,
                 c: c,
               ),
               const SizedBox(height: 12),
               _FeatureRow(
-                icon: Icons.auto_awesome_rounded,
-                label: 'Expert difficulty',
+                icon: Icons.block_rounded,
+                label: l.featureNoAds,
                 c: c,
               ),
               const SizedBox(height: 12),
               _FeatureRow(
-                icon: Icons.all_inclusive_rounded,
-                label: 'All future difficulty levels',
+                icon: Icons.electric_bolt_rounded,
+                label: l.featureNeonStyle,
                 c: c,
+                iconColor: const Color(0xFF00F5FF),
+              ),
+              const SizedBox(height: 12),
+              _FeatureRow(
+                icon: Icons.favorite_rounded,
+                label: l.featureSupportDev,
+                c: c,
+                iconColor: Colors.pinkAccent,
               ),
               const Spacer(),
               if (_errorMessage != null) ...[
@@ -260,18 +337,17 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
                       onRetry: _retryLoad,
                       c: c,
                       storeStatus: service.storeStatus,
-                      errorDetail: service.lastError,
                     );
                   }
                   return _BuyButton(
-                    label: 'Unlock for $price',
+                    label: l.unlockForPrice(price),
                     loading: _loading,
                     onTap: _buy,
                     c: c,
                   );
                 },
                 loading: () => _BuyButton(
-                  label: 'Loading price…',
+                  label: l.loadingPrice,
                   loading: true,
                   onTap: null,
                   c: c,
@@ -283,7 +359,6 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
                     onRetry: _retryLoad,
                     c: c,
                     storeStatus: service.storeStatus,
-                    errorDetail: e.toString(),
                   );
                 },
               ),
@@ -291,7 +366,7 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
               TextButton(
                 onPressed: _loading ? null : _restore,
                 child: Text(
-                  'Restore purchase',
+                  l.restorePurchases,
                   style: GoogleFonts.nunito(
                     fontSize: 14,
                     color: c.onSurfaceVariant,
@@ -300,13 +375,27 @@ class _UnlockProScreenState extends ConsumerState<UnlockProScreen> {
                   ),
                 ),
               ),
-              if (!isGoogleLinked) ...[
+              if (!isSocialLinked) ...[
                 const SizedBox(height: 4),
-                _GoogleSignInButton(
-                  loading: _googleLoading,
-                  onTap: (_loading || _googleLoading) ? null : _signInWithGoogle,
-                  c: c,
-                ),
+                // iOS: only Sign in with Apple (no third-party login → avoids Guideline 4.8)
+                // Android: only Google Sign-In
+                if (Platform.isIOS) ...[
+                  _AppleSignInButton(
+                    loading: _appleLoading,
+                    onTap: (_loading || _googleLoading || _appleLoading)
+                        ? null
+                        : _signInWithApple,
+                    c: c,
+                  ),
+                ] else ...[
+                  _GoogleSignInButton(
+                    loading: _googleLoading,
+                    onTap: (_loading || _googleLoading || _appleLoading)
+                        ? null
+                        : _signInWithGoogle,
+                    c: c,
+                  ),
+                ],
               ],
               const SizedBox(height: 8),
             ],
@@ -322,24 +411,27 @@ class _FeatureRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.c,
+    this.iconColor,
   });
 
   final IconData icon;
   final String label;
   final AppColors c;
+  final Color? iconColor;
 
   @override
   Widget build(BuildContext context) {
+    final color = iconColor ?? c.primary;
     return Row(
       children: [
         Container(
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: c.primary.withValues(alpha: 0.12),
+            color: color.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, size: 20, color: c.primary),
+          child: Icon(icon, size: 20, color: color),
         ),
         const SizedBox(width: 14),
         Text(
@@ -411,30 +503,30 @@ class _StoreUnavailable extends StatelessWidget {
     required this.onRetry,
     required this.c,
     required this.storeStatus,
-    this.errorDetail,
   });
 
   final bool retrying;
   final VoidCallback onRetry;
   final AppColors c;
   final StoreStatus storeStatus;
-  final String? errorDetail;
 
-  String get _message {
+  String _messageFor(AppLocalizations l) {
+    final isIOS = Platform.isIOS;
     switch (storeStatus) {
       case StoreStatus.storeUnavailable:
-        return 'Could not connect to Play Store.\nCheck your internet connection.';
+        return isIOS ? l.storeUnavailableIos : l.storeUnavailableAndroid;
       case StoreStatus.productNotFound:
-        return 'Product not found in Play Console.\nEnsure the product ID is "unlock_full_game" and its status is Active.';
+        return isIOS ? l.productNotFoundIos : l.productNotFoundAndroid;
       case StoreStatus.queryError:
-        return 'Play Store query error.\nMake sure the app was installed from the Play Store.';
+        return isIOS ? l.queryErrorIos : l.queryErrorAndroid;
       default:
-        return 'Could not load product info.\nEnsure you installed the app via Google Play.';
+        return isIOS ? l.storeInfoErrorIos : l.storeInfoErrorAndroid;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Column(
       children: [
         Container(
@@ -458,22 +550,12 @@ class _StoreUnavailable extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _message,
+                      _messageFor(l),
                       style: GoogleFonts.nunito(
                         fontSize: 13,
                         color: Colors.orange.shade800,
                       ),
                     ),
-                    if (errorDetail != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        errorDetail!,
-                        style: GoogleFonts.nunito(
-                          fontSize: 11,
-                          color: Colors.orange.shade600,
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -503,7 +585,7 @@ class _StoreUnavailable extends StatelessWidget {
                   )
                 : Icon(Icons.refresh_rounded, color: c.primary),
             label: Text(
-              retrying ? 'Loading…' : 'Try Again',
+              retrying ? l.loadingShort : l.tryAgainShort,
               style: GoogleFonts.nunito(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
@@ -513,6 +595,27 @@ class _StoreUnavailable extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _AppleSignInButton extends StatelessWidget {
+  const _AppleSignInButton({
+    required this.loading,
+    required this.onTap,
+    required this.c,
+  });
+
+  final bool loading;
+  final VoidCallback? onTap;
+  final AppColors c;
+
+  @override
+  Widget build(BuildContext context) {
+    return SignInWithAppleButton(
+      onPressed: (loading || onTap == null) ? () {} : onTap!,
+      style: SignInWithAppleButtonStyle.black,
+      borderRadius: BorderRadius.circular(12),
     );
   }
 }
@@ -553,8 +656,8 @@ class _GoogleSignInButton extends StatelessWidget {
             : const Icon(Icons.account_circle_outlined, size: 18),
         label: Text(
           loading
-              ? 'Signing in…'
-              : 'Sign in with Google to restore Pro',
+              ? AppLocalizations.of(context).signingIn
+              : AppLocalizations.of(context).signInWithGoogleRecover,
           style: GoogleFonts.nunito(
             fontSize: 13,
             color: c.onSurfaceVariant,

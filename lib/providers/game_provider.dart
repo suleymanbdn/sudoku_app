@@ -10,6 +10,7 @@ import '../game_logic/sudoku_engine.dart';
 import '../models/game_state.dart';
 import '../persistence/game_save_storage.dart';
 import '../services/sound_service.dart';
+import 'daily_challenge_provider.dart' show dailyChallengeSeed;
 import 'theme_provider.dart';
 
 
@@ -61,13 +62,16 @@ class GameNotifier extends StateNotifier<GameState> {
     super.dispose();
   }
 
-  Future<void> startGame(Difficulty difficulty) => _beginNewRound(
+  Future<void> startGame(Difficulty difficulty, {bool isPro = false}) =>
+      _beginNewRound(
         difficulty: difficulty,
         computeArg: difficulty.index,
         isDuel: false,
         duelRoomCode: null,
         duelIsHost: false,
-        hintsRemaining: difficulty.soloHintsAllowed,
+        // Pro users get effectively unlimited hints (999); free users get
+        // the default cap per difficulty.
+        hintsRemaining: isPro ? 999 : difficulty.soloHintsAllowed,
       );
 
   /// Same puzzle as [roomCode] (see [DuelRoomCode]); hints off for fairness.
@@ -86,6 +90,27 @@ class GameNotifier extends StateNotifier<GameState> {
         hintsRemaining: 0,
       );
 
+  Future<void> startDailyChallenge({bool isPro = false}) {
+    final difficulty = Difficulty.hard;
+    return _beginNewRound(
+      difficulty: difficulty,
+      computeArg: <String, dynamic>{
+        'd': difficulty.index,
+        'seed': dailyChallengeSeed(),
+      },
+      isDuel: false,
+      duelRoomCode: null,
+      duelIsHost: false,
+      hintsRemaining: isPro ? 999 : difficulty.soloHintsAllowed,
+      isDailyChallenge: true,
+    );
+  }
+
+  /// Grants one extra hint — used after the user watches a rewarded ad.
+  void addHint() {
+    state = state.copyWith(hintsRemaining: state.hintsRemaining + 1);
+  }
+
   Future<void> _beginNewRound({
     required Difficulty difficulty,
     required Object computeArg,
@@ -93,6 +118,7 @@ class GameNotifier extends StateNotifier<GameState> {
     required String? duelRoomCode,
     required bool duelIsHost,
     required int hintsRemaining,
+    bool isDailyChallenge = false,
   }) async {
     _stopTimer();
     await clearActiveGameSave(_prefs);
@@ -130,6 +156,7 @@ class GameNotifier extends StateNotifier<GameState> {
       isDuel: isDuel,
       duelRoomCode: duelRoomCode,
       duelIsHost: duelIsHost,
+      isDailyChallenge: isDailyChallenge,
     );
 
     // Duel games delay timer start until the countdown overlay finishes.
@@ -159,6 +186,22 @@ class GameNotifier extends StateNotifier<GameState> {
     _startTimer();
   }
 
+  /// Grants one extra mistake after the player watches a rewarded ad.
+  /// Revives the game from [GameStatus.lost] back to [GameStatus.playing].
+  /// Can only be used once per game session.
+  void grantExtraLife() {
+    if (state.status != GameStatus.lost) return;
+    if (state.extraLifeUsed) return;
+    // Decrement mistakeCount by 1 → player gets exactly one more mistake before
+    // losing again. extraLifeUsed is set to prevent repeated use.
+    state = state.copyWith(
+      status: GameStatus.playing,
+      extraLifeUsed: true,
+      mistakeCount: state.mistakeCount - 1,
+    );
+    _startTimer();
+  }
+
   void selectCell(int row, int col) {
     if (state.status != GameStatus.playing) return;
     if (state.selectedRow == row && state.selectedCol == col) {
@@ -177,13 +220,21 @@ class GameNotifier extends StateNotifier<GameState> {
     if (state.isSelectionFixed) return;
     if (state.status != GameStatus.playing) return;
 
+    final row = state.selectedRow;
+    final col = state.selectedCol;
+
+    // Lock correctly placed user numbers — cannot overwrite or erase a correct cell
+    final currentVal = state.currentBoard[row][col];
+    if (currentVal != 0 &&
+        !state.errorCells.contains('$row,$col') &&
+        currentVal == state.solution[row][col]) {
+      return;
+    }
+
     if (state.noteMode && number != 0) {
       toggleNote(number);
       return;
     }
-
-    final row = state.selectedRow;
-    final col = state.selectedCol;
 
     if (state.currentBoard[row][col] == number) return;
 
@@ -226,26 +277,6 @@ class GameNotifier extends StateNotifier<GameState> {
       status: newStatus,
     );
 
-    if (isNewError && newStatus == GameStatus.playing) {
-      Future.delayed(const Duration(milliseconds: 650), () {
-        _clearErrorCell(row, col);
-      });
-    }
-  }
-
-  void _clearErrorCell(int row, int col) {
-    if (state.status != GameStatus.playing) return;
-    if (!state.errorCells.contains('$row,$col')) return;
-
-    final board = state.currentBoard.map((r) => List<int>.from(r)).toList();
-    board[row][col] = 0;
-
-    final errors = Set<String>.from(state.errorCells)..remove('$row,$col');
-
-    state = state.copyWith(
-      currentBoard: board,
-      errorCells: errors,
-    );
   }
 
   void clearSelectedCell() {
@@ -448,6 +479,8 @@ class BoardSnapshot {
   final int selectedCol;
   final List<List<Set<int>>> notes;
   final GameStatus status;
+  final Set<String> highlightedCells;
+  final Set<String> sameDigitCells;
 
   const BoardSnapshot({
     required this.currentBoard,
@@ -457,6 +490,8 @@ class BoardSnapshot {
     required this.selectedCol,
     required this.notes,
     required this.status,
+    required this.highlightedCells,
+    required this.sameDigitCells,
   });
 
   factory BoardSnapshot.from(GameState s) => BoardSnapshot(
@@ -467,7 +502,39 @@ class BoardSnapshot {
         selectedCol: s.selectedCol,
         notes: s.notes,
         status: s.status,
+        highlightedCells: _peerHighlightKeys(s.selectedRow, s.selectedCol),
+        sameDigitCells: _sameDigitKeys(s),
       );
+
+  static Set<String> _peerHighlightKeys(int row, int col) {
+    if (row < 0 || col < 0 || row > 8 || col > 8) return {};
+    final br = row ~/ 3 * 3;
+    final bc = col ~/ 3 * 3;
+    final keys = <String>{};
+    for (var i = 0; i < 9; i++) {
+      keys.add('$row,$i');
+      keys.add('$i,$col');
+    }
+    for (var r = br; r < br + 3; r++) {
+      for (var c = bc; c < bc + 3; c++) {
+        keys.add('$r,$c');
+      }
+    }
+    return keys;
+  }
+
+  static Set<String> _sameDigitKeys(GameState s) {
+    if (!s.hasSelection) return {};
+    final v = s.currentBoard[s.selectedRow][s.selectedCol];
+    if (v == 0) return {};
+    final keys = <String>{};
+    for (var r = 0; r < 9; r++) {
+      for (var c = 0; c < 9; c++) {
+        if (s.currentBoard[r][c] == v) keys.add('$r,$c');
+      }
+    }
+    return keys;
+  }
 
   int countOnBoard(int num) {
     if (currentBoard.length != 9) return 0;
@@ -495,7 +562,9 @@ class BoardSnapshot {
         selectedRow == other.selectedRow &&
         selectedCol == other.selectedCol &&
         identical(notes, other.notes) &&
-        status == other.status;
+        status == other.status &&
+        highlightedCells == other.highlightedCells &&
+        sameDigitCells == other.sameDigitCells;
   }
 
   @override
@@ -507,6 +576,8 @@ class BoardSnapshot {
         selectedCol,
         identityHashCode(notes),
         status,
+        highlightedCells,
+        sameDigitCells,
       );
 }
 
@@ -581,7 +652,8 @@ class ScoreNotifier extends StateNotifier<List<GameScore>> {
     int timeSeconds,
     int mistakeCount,
   ) async {
-    state = [
+    const maxScores = 200;
+    var updated = [
       ...state,
       GameScore(
         difficulty: difficulty,
@@ -589,6 +661,10 @@ class ScoreNotifier extends StateNotifier<List<GameScore>> {
         mistakeCount: mistakeCount,
       ),
     ];
+    if (updated.length > maxScores) {
+      updated = updated.sublist(updated.length - maxScores);
+    }
+    state = updated;
     await _persist();
   }
 

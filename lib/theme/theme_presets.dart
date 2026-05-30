@@ -2,6 +2,12 @@ import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
 
+/// Global light/dark appearance (persisted). Separate from [AppThemeId] palette choice.
+enum AppBrightness {
+  light,
+  dark;
+}
+
 enum AppThemeId {
   sakura,
   ocean,
@@ -10,7 +16,8 @@ enum AppThemeId {
   lavender,
   midnight,
   honey,
-  wine;
+  wine,
+  neon;
 
   String get label => switch (this) {
         sakura => 'Sakura',
@@ -21,6 +28,7 @@ enum AppThemeId {
         midnight => 'Midnight',
         honey => 'Honey',
         wine => 'Wine',
+        neon => 'Neon',
       };
 
   String get subtitle => switch (this) {
@@ -32,10 +40,11 @@ enum AppThemeId {
         midnight => 'Navy & cool blue',
         honey => 'Amber & gold',
         wine => 'Burgundy & rose',
+        neon => 'Electric & dark',
       };
 }
 
-AppColors appColorsFor(AppThemeId id) => switch (id) {
+AppColors _appColorsFor(AppThemeId id) => switch (id) {
       AppThemeId.sakura => _sakura,
       AppThemeId.ocean => _ocean,
       AppThemeId.forest => _forest,
@@ -44,7 +53,230 @@ AppColors appColorsFor(AppThemeId id) => switch (id) {
       AppThemeId.midnight => _midnight,
       AppThemeId.honey => _honey,
       AppThemeId.wine => _wine,
+      AppThemeId.neon => _neon,
     };
+
+/// Resolves palette for theme + appearance. [AppThemeId.neon] uses [_neon] / [_neonLight].
+/// With Pro neon effects on, [applyNeonSkin] further boosts saturation on top (light & dark).
+AppColors resolveAppColors(AppThemeId id, AppBrightness brightness) {
+  if (id == AppThemeId.neon) {
+    return brightness == AppBrightness.dark ? _neon : _neonLight;
+  }
+  final light = _appColorsFor(id);
+  if (brightness == AppBrightness.light) return light;
+  return darkVariantFromLight(light);
+}
+
+AppColors darkVariantFromLight(AppColors l) {
+  if (l.isDark) return l;
+  final base = l.inverseSurface;
+  final card = Color.lerp(base, l.container, 0.22) ?? base;
+  final soft = Color.lerp(base, l.container, 0.16) ?? base;
+  return l.copyWith(
+    isDark: true,
+    surface: base,
+    pureWhite: card,
+    softWhite: soft,
+    onSurface: l.onInverseSurface,
+    onSurfaceVariant: Color.alphaBlend(
+      l.onInverseSurface.withValues(alpha: 0.75),
+      base,
+    ),
+    // Increased from 0.28 → 0.48 so numpad buttons are clearly visible
+    container: Color.alphaBlend(l.container.withValues(alpha: 0.48), base),
+    secondaryContainer: Color.alphaBlend(
+      l.secondaryContainer.withValues(alpha: 0.36),
+      base,
+    ),
+    tertiaryContainer: Color.alphaBlend(
+      l.tertiaryContainer.withValues(alpha: 0.28),
+      base,
+    ),
+    // Increased from 0.55 → 0.75 so grid lines are clearly visible in dark
+    outline: Color.alphaBlend(l.outline.withValues(alpha: 0.75), base),
+    outlineVariant:
+        Color.alphaBlend(l.outlineVariant.withValues(alpha: 0.55), base),
+    inverseSurface: l.surface,
+    onInverseSurface: l.onSurface,
+    inversePrimary: l.inversePrimary,
+    primary: l.primaryLight,
+    primaryLight: Color.lerp(l.primaryLight, l.pastel, 0.45) ?? l.primaryLight,
+    pastel: Color.alphaBlend(l.pastel.withValues(alpha: 0.45), base),
+    dark: l.primary,
+    tertiary: l.tertiary,
+    onTertiaryContainer: l.onTertiaryContainer,
+  );
+}
+
+// --- Neon skin helpers (palette hue → saturated “tube” colors) ---
+
+Color _neonTube(Color seed, {double lightness = 0.54}) {
+  final h = HSLColor.fromColor(seed);
+  return h
+      .withSaturation((h.saturation + 0.22).clamp(0.0, 1.0))
+      .withLightness(lightness.clamp(0.4, 0.62))
+      .toColor();
+}
+
+Color _neonTubeLight(Color seed) {
+  final h = HSLColor.fromColor(seed);
+  return h
+      .withSaturation((h.saturation + 0.15).clamp(0.0, 1.0))
+      .withLightness((h.lightness + 0.1).clamp(0.48, 0.78))
+      .toColor();
+}
+
+Color _neonAccent(Color seed) {
+  final h = HSLColor.fromColor(seed);
+  return h
+      .withSaturation((h.saturation + 0.18).clamp(0.0, 1.0))
+      .withLightness(0.52.clamp(0.42, 0.68))
+      .toColor();
+}
+
+AppColors _neonSkinDarkCanvas(AppColors resolved) {
+  final neonPrimary = _neonTube(resolved.primary);
+  final neonPrimaryLight = _neonTubeLight(resolved.primaryLight);
+  final neonTertiary = _neonAccent(resolved.tertiary);
+
+  const neutral = Color(0xFF0A0B10);
+  final surface =
+      Color.alphaBlend(resolved.primary.withValues(alpha: 0.14), neutral);
+  final pureWhite = Color.alphaBlend(
+    resolved.primary.withValues(alpha: 0.09),
+    const Color(0xFF11131C),
+  );
+  final softWhite = Color.alphaBlend(
+    resolved.primary.withValues(alpha: 0.11),
+    const Color(0xFF13151F),
+  );
+
+  final onSurface =
+      Color.lerp(resolved.onSurface, Colors.white, 0.14) ?? resolved.onSurface;
+  final onSurfaceVariant = Color.alphaBlend(
+    neonPrimaryLight.withValues(alpha: 0.38),
+    Color.alphaBlend(onSurface.withValues(alpha: 0.88), surface),
+  );
+
+  final container =
+      Color.alphaBlend(neonPrimary.withValues(alpha: 0.2), surface);
+  final secondaryContainer =
+      Color.alphaBlend(neonPrimaryLight.withValues(alpha: 0.16), surface);
+  final tertiaryContainer =
+      Color.alphaBlend(neonTertiary.withValues(alpha: 0.14), surface);
+
+  final outline =
+      Color.alphaBlend(neonPrimary.withValues(alpha: 0.48), surface);
+  final outlineVariant =
+      Color.alphaBlend(neonPrimary.withValues(alpha: 0.28), surface);
+  final pastel =
+      Color.alphaBlend(neonPrimaryLight.withValues(alpha: 0.52), surface);
+  final darkDeep = HSLColor.fromColor(neonPrimary).withLightness(0.22).toColor();
+  final onTertiary =
+      Color.lerp(onSurface, neonTertiary, 0.72) ?? neonTertiary;
+
+  return resolved.copyWith(
+    isDark: true,
+    primary: neonPrimary,
+    primaryLight: neonPrimaryLight,
+    pastel: pastel,
+    container: container,
+    dark: darkDeep,
+    surface: surface,
+    pureWhite: pureWhite,
+    softWhite: softWhite,
+    onSurface: onSurface,
+    onSurfaceVariant: onSurfaceVariant,
+    outline: outline,
+    outlineVariant: outlineVariant,
+    shadow: neonPrimary.withValues(alpha: 0.38),
+    secondaryContainer: secondaryContainer,
+    tertiary: neonTertiary,
+    tertiaryContainer: tertiaryContainer,
+    onTertiaryContainer: onTertiary,
+    inverseSurface: resolved.surface,
+    onInverseSurface: resolved.onSurface,
+    inversePrimary: neonPrimaryLight,
+  );
+}
+
+/// Light canvas: bright surfaces with boosted neon primaries (all presets + Neon light).
+AppColors _neonSkinLightCanvas(AppColors resolved) {
+  final neonPrimary = _neonTube(resolved.primary, lightness: 0.48);
+  final neonPrimaryLight = _neonTubeLight(resolved.primaryLight);
+  final neonTertiary = _neonAccent(resolved.tertiary);
+
+  final surface =
+      Color.alphaBlend(neonPrimary.withValues(alpha: 0.09), resolved.surface);
+  final pureWhite =
+      Color.alphaBlend(neonPrimary.withValues(alpha: 0.05), resolved.pureWhite);
+  final softWhite =
+      Color.alphaBlend(neonPrimary.withValues(alpha: 0.06), resolved.softWhite);
+  final container =
+      Color.alphaBlend(neonPrimary.withValues(alpha: 0.16), resolved.container);
+  final secondaryContainer = Color.alphaBlend(
+    neonPrimaryLight.withValues(alpha: 0.14),
+    resolved.secondaryContainer,
+  );
+  final tertiaryContainer = Color.alphaBlend(
+    neonTertiary.withValues(alpha: 0.12),
+    resolved.tertiaryContainer,
+  );
+  final pastel =
+      Color.lerp(resolved.pastel, neonPrimaryLight, 0.38) ?? resolved.pastel;
+  final outline =
+      Color.lerp(resolved.outline, neonPrimary, 0.5) ?? resolved.outline;
+  final outlineVariant = Color.lerp(
+        resolved.outlineVariant,
+        neonPrimaryLight,
+        0.38,
+      ) ??
+      resolved.outlineVariant;
+  final onSurfaceVariant = Color.lerp(
+        resolved.onSurfaceVariant,
+        neonPrimary,
+        0.12,
+      ) ??
+      resolved.onSurfaceVariant;
+  final darkDeep =
+      HSLColor.fromColor(neonPrimary).withLightness(0.30).toColor();
+
+  return resolved.copyWith(
+    isDark: false,
+    primary: neonPrimary,
+    primaryLight: neonPrimaryLight,
+    pastel: pastel,
+    tertiary: neonTertiary,
+    surface: surface,
+    pureWhite: pureWhite,
+    softWhite: softWhite,
+    container: container,
+    secondaryContainer: secondaryContainer,
+    tertiaryContainer: tertiaryContainer,
+    outline: outline,
+    outlineVariant: outlineVariant,
+    shadow: neonPrimary.withValues(alpha: 0.28),
+    dark: darkDeep,
+    onSurfaceVariant: onSurfaceVariant,
+    inversePrimary: neonPrimaryLight,
+  );
+}
+
+/// Pro neon chrome: appearance-aware. Light keeps a bright UI with saturated hues;
+/// dark uses the cyber canvas. [AppThemeId.neon] + dark keeps [_neon] unchanged.
+AppColors applyNeonSkin(
+  AppColors resolved, {
+  required AppThemeId themeId,
+  required AppBrightness brightness,
+}) {
+  if (themeId == AppThemeId.neon && brightness == AppBrightness.dark) {
+    return resolved;
+  }
+  if (brightness == AppBrightness.light) {
+    return _neonSkinLightCanvas(resolved);
+  }
+  return _neonSkinDarkCanvas(resolved);
+}
 
 const _sakura = AppColors(
   primary: Color(0xFFE91E8C),
@@ -228,4 +460,53 @@ const _wine = AppColors(
   inverseSurface: Color(0xFF2A1018),
   onInverseSurface: Color(0xFFFCE8EF),
   inversePrimary: Color(0xFFF48FB1),
+);
+
+const _neon = AppColors(
+  isDark: true,
+  primary: Color(0xFF00E5FF),
+  primaryLight: Color(0xFF4DD0E1),
+  pastel: Color(0xFF80DEEA),
+  container: Color(0xFF0D2530),
+  dark: Color(0xFF0097A7),
+  surface: Color(0xFF07090E),
+  pureWhite: Color(0xFF0B1520),
+  softWhite: Color(0xFF0E1C2A),
+  onSurface: Color(0xFFCCEEF4),
+  onSurfaceVariant: Color(0xFF6AAFBC),
+  outline: Color(0xFF1A3540),
+  shadow: Color(0x3300E5FF),
+  secondaryContainer: Color(0xFF0A1C28),
+  tertiary: Color(0xFF64FF47),
+  tertiaryContainer: Color(0xFF071A05),
+  onTertiaryContainer: Color(0xFF64FF47),
+  outlineVariant: Color(0xFF152A35),
+  inverseSurface: Color(0xFFCCEEF4),
+  onInverseSurface: Color(0xFF07090E),
+  inversePrimary: Color(0xFF006064),
+);
+
+/// Light-room variant of the neon cyber palette ([AppBrightness.light] + neon theme).
+const _neonLight = AppColors(
+  isDark: false,
+  primary: Color(0xFF00ACC1),
+  primaryLight: Color(0xFF26C6DA),
+  pastel: Color(0xFFB2EBF2),
+  container: Color(0xFFE0F7FA),
+  dark: Color(0xFF00838F),
+  surface: Color(0xFFF2FDFF),
+  pureWhite: Color(0xFFFFFFFF),
+  softWhite: Color(0xFFEEFBFC),
+  onSurface: Color(0xFF002329),
+  onSurfaceVariant: Color(0xFF006978),
+  outline: Color(0xFFB2EBF2),
+  shadow: Color(0x2200ACC1),
+  secondaryContainer: Color(0xFFDFFFE8),
+  tertiary: Color(0xFF00C853),
+  tertiaryContainer: Color(0xFFE8F5E9),
+  onTertiaryContainer: Color(0xFF1B5E20),
+  outlineVariant: Color(0xFFD6F5F7),
+  inverseSurface: Color(0xFF00424A),
+  onInverseSurface: Color(0xFFE0F7FA),
+  inversePrimary: Color(0xFF00E5FF),
 );

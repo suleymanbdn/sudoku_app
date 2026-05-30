@@ -29,6 +29,8 @@ class GameState {
     this.isDuel = false,
     this.duelRoomCode,
     this.duelIsHost = false,
+    this.isDailyChallenge = false,
+    this.extraLifeUsed = false,
   });
 
   final Difficulty difficulty;
@@ -51,6 +53,13 @@ class GameState {
   final String? duelRoomCode;
   final bool duelIsHost;
 
+  /// True when this round is the Daily Challenge.
+  final bool isDailyChallenge;
+
+  /// True once the player has used the "watch ad → extra life" rescue.
+  /// Capped at one use per game so it can't be abused.
+  final bool extraLifeUsed;
+
   factory GameState.initial() => GameState(
         difficulty: Difficulty.easy,
         solution: const [],
@@ -69,6 +78,7 @@ class GameState {
         isDuel: false,
         duelRoomCode: null,
         duelIsHost: false,
+        isDailyChallenge: false,
       );
 
   bool get hasSelection => selectedRow >= 0 && selectedCol >= 0;
@@ -110,6 +120,8 @@ class GameState {
     bool? isDuel,
     String? duelRoomCode,
     bool? duelIsHost,
+    bool? isDailyChallenge,
+    bool? extraLifeUsed,
   }) =>
       GameState(
         difficulty: difficulty ?? this.difficulty,
@@ -129,5 +141,7 @@ class GameState {
         isDuel: isDuel ?? this.isDuel,
         duelRoomCode: duelRoomCode ?? this.duelRoomCode,
         duelIsHost: duelIsHost ?? this.duelIsHost,
+        isDailyChallenge: isDailyChallenge ?? this.isDailyChallenge,
+        extraLifeUsed: extraLifeUsed ?? this.extraLifeUsed,
       );
 }

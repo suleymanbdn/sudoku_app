@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   const AppColors({
+    this.isDark = false,
     required this.primary,
     required this.primaryLight,
     required this.pastel,
@@ -26,6 +27,7 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.inversePrimary,
   });
 
+  final bool isDark;
   final Color primary;
   final Color primaryLight;
   final Color pastel;
@@ -79,12 +81,13 @@ class AppColors extends ThemeExtension<AppColors> {
         const Color(0xFFFFC107),
         const Color(0xFFFF8F00),
         const Color(0xFFFFECB3),
-        pureWhite,
-        dark,
+        isDark ? const Color(0xFFFFFFFF) : pureWhite,
+        isDark ? tertiary : dark,
       ];
 
   @override
   AppColors copyWith({
+    bool? isDark,
     Color? primary,
     Color? primaryLight,
     Color? pastel,
@@ -107,6 +110,7 @@ class AppColors extends ThemeExtension<AppColors> {
     Color? inversePrimary,
   }) {
     return AppColors(
+      isDark: isDark ?? this.isDark,
       primary: primary ?? this.primary,
       primaryLight: primaryLight ?? this.primaryLight,
       pastel: pastel ?? this.pastel,
@@ -137,6 +141,7 @@ class AppColors extends ThemeExtension<AppColors> {
     if (t == 1) return other;
     Color lc(Color a, Color b) => Color.lerp(a, b, t) ?? a;
     return AppColors(
+      isDark: t >= 0.5 ? other.isDark : isDark,
       primary: lc(primary, other.primary),
       primaryLight: lc(primaryLight, other.primaryLight),
       pastel: lc(pastel, other.pastel),
