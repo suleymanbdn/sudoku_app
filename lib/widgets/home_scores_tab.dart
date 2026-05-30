@@ -8,6 +8,7 @@ import '../l10n/difficulty_label.dart';
 import '../providers/daily_challenge_provider.dart';
 import '../providers/game_provider.dart';
 import '../theme/app_colors.dart';
+import 'effects/entrance.dart';
 import 'gradient_text.dart';
 
 class ScoresTab extends ConsumerWidget {
@@ -56,7 +57,7 @@ class ScoresTab extends ConsumerWidget {
     ];
 
     return Scaffold(
-      backgroundColor: c.surface,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: SingleChildScrollView(
           child: Column(
@@ -74,7 +75,9 @@ class ScoresTab extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               // Banner
-              Padding(
+              Entrance(
+                delay: const Duration(milliseconds: 80),
+                child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
                   padding:
@@ -172,6 +175,7 @@ class ScoresTab extends ConsumerWidget {
                   ),
                 ),
               ),
+              ),
               const SizedBox(height: 28),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -241,7 +245,9 @@ class ScoresTab extends ConsumerWidget {
                   ),
                 )
               else
-                Padding(
+                Entrance(
+                  delay: const Duration(milliseconds: 150),
+                  child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: GridView.count(
                     crossAxisCount: 2,
@@ -261,6 +267,7 @@ class ScoresTab extends ConsumerWidget {
                         ),
                     ],
                   ),
+                ),
                 ),
               const SizedBox(height: 28),
             ],

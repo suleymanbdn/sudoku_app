@@ -5,7 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import '../l10n/app_localizations.dart';
 import '../models/game_state.dart';
 import '../providers/game_provider.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_colors.dart';
+import '../theme/theme_presets.dart';
+import '../widgets/effects/ambient_background.dart';
 import '../widgets/home_play_tab.dart';
 import '../widgets/home_scores_tab.dart';
 import '../widgets/home_settings_tab.dart';
@@ -24,6 +27,7 @@ class _SudokuHomePageState extends ConsumerState<SudokuHomePage> {
   Widget build(BuildContext context) {
     final c = context.appColors;
     final l = AppLocalizations.of(context);
+    final dark = ref.watch(brightnessProvider) == AppBrightness.dark;
     final gameStatus = ref.watch(gameStatusProvider);
 
     if (gameStatus == GameStatus.generating) {
@@ -47,13 +51,17 @@ class _SudokuHomePageState extends ConsumerState<SudokuHomePage> {
 
     return Scaffold(
       backgroundColor: c.surface,
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: [
-          const PlayTab(),
-          ScoresTab(onPlayTap: () => setState(() => _selectedIndex = 0)),
-          const SettingsTab(),
-        ],
+      body: AmbientBackground(
+        colors: c,
+        dark: dark,
+        child: IndexedStack(
+          index: _selectedIndex,
+          children: [
+            const PlayTab(),
+            ScoresTab(onPlayTap: () => setState(() => _selectedIndex = 0)),
+            const SettingsTab(),
+          ],
+        ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,

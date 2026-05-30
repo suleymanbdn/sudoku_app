@@ -13,6 +13,7 @@ import '../screens/game_screen.dart';
 import '../screens/unlock_pro_screen.dart';
 import '../theme/app_colors.dart';
 import '../screens/duel_lobby_screen.dart';
+import 'effects/entrance.dart';
 import 'sudoku_brand_title.dart';
 
 class PlayTab extends ConsumerWidget {
@@ -20,33 +21,39 @@ class PlayTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final c = context.appColors;
     final gameStatus = ref.watch(gameStatusProvider);
     final hasActiveGame =
         gameStatus == GameStatus.playing || gameStatus == GameStatus.paused;
 
     return Scaffold(
-      backgroundColor: c.surface,
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _PlayHeader(),
+              const Entrance(delay: Duration(milliseconds: 40), child: _PlayHeader()),
               if (hasActiveGame) ...[
                 const SizedBox(height: 20),
-                const _ContinueCard(),
+                const Entrance(
+                    delay: Duration(milliseconds: 110), child: _ContinueCard()),
               ],
               const SizedBox(height: 20),
-              const _DailyChallengeCard(),
+              const Entrance(
+                  delay: Duration(milliseconds: 180),
+                  child: _DailyChallengeCard()),
               const SizedBox(height: 16),
               const SizedBox(height: 12),
-              const _DifficultySection(),
+              const Entrance(
+                  delay: Duration(milliseconds: 250),
+                  child: _DifficultySection()),
               const SizedBox(height: 20),
-              const _DuelRaceCard(),
+              const Entrance(
+                  delay: Duration(milliseconds: 320), child: _DuelRaceCard()),
               const SizedBox(height: 20),
-              const _ProBanner(),
+              const Entrance(
+                  delay: Duration(milliseconds: 390), child: _ProBanner()),
               const SizedBox(height: 24),
             ],
           ),
@@ -331,7 +338,8 @@ class _DifficultyCard extends ConsumerWidget {
     final textColor = _isDark ? Colors.white : c.onSurface;
     final subColor = _isDark ? Colors.white70 : c.onSurfaceVariant;
 
-    return Material(
+    return _PressScale(
+      child: Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: () async {
@@ -522,6 +530,7 @@ class _DifficultyCard extends ConsumerWidget {
             ],
           ),
         ),
+      ),
       ),
     );
   }
@@ -912,7 +921,8 @@ class _ProBanner extends ConsumerWidget {
     if (isPro) return const SizedBox.shrink();
     final l = AppLocalizations.of(context);
 
-    return GestureDetector(
+    return _PressScale(
+      child: GestureDetector(
       onTap: () async {
         final purchased =
             await Navigator.of(context).push<bool>(UnlockProScreen.route());
@@ -992,6 +1002,38 @@ class _ProBanner extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+      ),
+    );
+  }
+}
+
+/// Subtle press feedback — scales down to 0.97 while a pointer is held,
+/// springing back on release. Uses [Listener] so it never competes with the
+/// child's own tap gesture (InkWell / GestureDetector).
+class _PressScale extends StatefulWidget {
+  const _PressScale({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_PressScale> createState() => _PressScaleState();
+}
+
+class _PressScaleState extends State<_PressScale> {
+  bool _down = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Listener(
+      onPointerDown: (_) => setState(() => _down = true),
+      onPointerUp: (_) => setState(() => _down = false),
+      onPointerCancel: (_) => setState(() => _down = false),
+      child: AnimatedScale(
+        scale: _down ? 0.97 : 1.0,
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+        child: widget.child,
       ),
     );
   }

@@ -12,8 +12,11 @@ import '../models/game_state.dart';
 import '../providers/daily_challenge_provider.dart';
 import '../providers/duel_provider.dart';
 import '../providers/game_provider.dart';
+import '../providers/theme_provider.dart';
 import '../services/sound_service.dart';
 import '../theme/app_colors.dart';
+import '../theme/theme_presets.dart';
+import '../widgets/effects/ambient_background.dart';
 import '../widgets/game/game_info.dart';
 import '../widgets/game/game_overlays.dart';
 import '../widgets/game/numpad.dart';
@@ -151,6 +154,7 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   @override
   Widget build(BuildContext context) {
     final c = context.appColors;
+    final dark = ref.watch(brightnessProvider) == AppBrightness.dark;
 
     // ── Group completion: sweep flash + sound + haptic ──────────────────────
     ref.listen<Set<String>>(completedGroupsProvider, (prev, next) {
@@ -265,8 +269,11 @@ class _GameScreenState extends ConsumerState<GameScreen> {
       stream: _flashBus.stream,
       child: Stack(
         children: [
+          Positioned.fill(
+            child: AmbientBackground(colors: c, dark: dark, intensity: 0.5),
+          ),
           Scaffold(
-            backgroundColor: c.surface,
+            backgroundColor: Colors.transparent,
             appBar: AppBar(
               centerTitle: false,
               titleSpacing: 12,
