@@ -185,8 +185,14 @@ class _ContinueCard extends ConsumerWidget {
                   Text(
                     l.continueGame,
                     style: theme.textTheme.titleSmall?.copyWith(
-                      color: c.primary,
-                      fontWeight: FontWeight.w700,
+                      // In dark mode, primary often blends into the lightened
+                      // secondaryContainer card BG. Lift contrast by mixing
+                      // primary with white.
+                      color: c.isDark
+                          ? (Color.lerp(c.primary, Colors.white, 0.35) ??
+                              c.primary)
+                          : c.primary,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                   const SizedBox(height: 2),
