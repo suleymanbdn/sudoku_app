@@ -1,5 +1,6 @@
 // Short user-facing strings for sign-in and restore flows.
-import 'dart:io';
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 
 import 'l10n/app_localizations.dart';
 
@@ -19,7 +20,7 @@ String googleSignInErrorForUser(AppLocalizations l, Object error) {
 
 /// After “Restore purchases” when no Premium is found.
 String proRestoreNotFoundForUser(AppLocalizations l) {
-  if (Platform.isIOS) {
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
     return l.proRestoreNotFoundIos;
   }
   return l.proRestoreNotFoundAndroid;

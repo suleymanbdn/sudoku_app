@@ -219,10 +219,15 @@ class _NumButtonState extends State<_NumButton>
                 child: Text(
                   '${widget.number}',
                   style: theme.textTheme.titleMedium?.copyWith(
+                    // In dark mode, primary blended with white reads MUCH stronger
+                    // against the lightened container background.
                     color: widget.isComplete
                         ? c.primary.withValues(alpha: 0.3)
                         : (widget.isEnabled
-                            ? c.primary
+                            ? (c.isDark
+                                ? (Color.lerp(c.primary, Colors.white, 0.35) ??
+                                    c.primary)
+                                : c.primary)
                             : c.onSurfaceVariant.withValues(alpha: 0.5)),
                     fontWeight: FontWeight.w800,
                   ),

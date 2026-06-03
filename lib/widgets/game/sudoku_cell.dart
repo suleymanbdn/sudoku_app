@@ -235,8 +235,12 @@ class _SudokuCellState extends State<SudokuCell>
               has ? '$digit' : '',
               style: GoogleFonts.nunito(
                 fontSize: 8,
-                fontWeight: FontWeight.w700,
-                color: c.onSurfaceVariant.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w800,
+                // Was onSurfaceVariant.alpha(0.7) — too faded to read on most palettes.
+                // Now: onSurface in dark, onSurfaceVariant in light (still clear).
+                color: c.isDark
+                    ? c.onSurface.withValues(alpha: 0.85)
+                    : c.onSurfaceVariant.withValues(alpha: 0.85),
               ),
             ),
           );

@@ -1,5 +1,5 @@
-import 'dart:io';
-
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, kIsWeb, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -41,8 +41,10 @@ class SettingsTab extends StatelessWidget {
               const SizedBox(height: 20),
               const _NeonEffectsSection(),
               const SizedBox(height: 28),
-              // Google account card: Android only — iOS uses Apple Sign-In (Guideline 4.8)
-              if (!Platform.isIOS) ...[
+              // Google account card: Android only — iOS uses Apple Sign-In (Guideline 4.8).
+              // Use defaultTargetPlatform (not dart:io Platform) for web compatibility.
+              if (kIsWeb ||
+                  defaultTargetPlatform != TargetPlatform.iOS) ...[
                 const _AccountSectionLabel(),
                 const SizedBox(height: 10),
                 const AccountCard(),

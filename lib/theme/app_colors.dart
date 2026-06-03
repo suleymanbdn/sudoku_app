@@ -54,14 +54,20 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color onInverseSurface;
   final Color inversePrimary;
 
-  Color get cellSelected =>
-      Color.alphaBlend(primary.withValues(alpha: 0.42), pureWhite);
+  Color get cellSelected => Color.alphaBlend(
+        primary.withValues(alpha: isDark ? 0.55 : 0.42),
+        pureWhite,
+      );
 
-  Color get cellSameNumber =>
-      Color.alphaBlend(primary.withValues(alpha: 0.22), pureWhite);
+  Color get cellSameNumber => Color.alphaBlend(
+        primary.withValues(alpha: isDark ? 0.30 : 0.22),
+        pureWhite,
+      );
 
-  Color get cellHouseHighlight =>
-      Color.alphaBlend(primary.withValues(alpha: 0.11), surface);
+  Color get cellHouseHighlight => Color.alphaBlend(
+        primary.withValues(alpha: isDark ? 0.18 : 0.13),
+        surface,
+      );
 
   Color get notePadBackground =>
       Color.alphaBlend(container.withValues(alpha: 0.65), pureWhite);

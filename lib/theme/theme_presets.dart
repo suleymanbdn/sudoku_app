@@ -78,8 +78,9 @@ AppColors darkVariantFromLight(AppColors l) {
     pureWhite: card,
     softWhite: soft,
     onSurface: l.onInverseSurface,
+    // Bumped from 0.75 → 0.92 so numpad digits and notes are clearly visible
     onSurfaceVariant: Color.alphaBlend(
-      l.onInverseSurface.withValues(alpha: 0.75),
+      l.onInverseSurface.withValues(alpha: 0.92),
       base,
     ),
     // Increased from 0.28 → 0.48 so numpad buttons are clearly visible
