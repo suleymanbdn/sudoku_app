@@ -83,8 +83,8 @@ AppColors darkVariantFromLight(AppColors l) {
       l.onInverseSurface.withValues(alpha: 0.92),
       base,
     ),
-    // Increased from 0.28 → 0.48 so numpad buttons are clearly visible
-    container: Color.alphaBlend(l.container.withValues(alpha: 0.48), base),
+    // Increased from 0.48 → 0.65 so numpad buttons stand out from surface
+    container: Color.alphaBlend(l.container.withValues(alpha: 0.65), base),
     secondaryContainer: Color.alphaBlend(
       l.secondaryContainer.withValues(alpha: 0.36),
       base,

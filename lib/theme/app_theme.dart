@@ -221,8 +221,15 @@ class AppTheme {
       ),
       iconButtonTheme: IconButtonThemeData(
         style: IconButton.styleFrom(
-          foregroundColor: c.primary,
+          // In dark mode, primary is too close in hue to container — blend with
+          // white for clearly readable icon glyphs.
+          foregroundColor: c.isDark
+              ? (Color.lerp(c.primary, Colors.white, 0.55) ?? c.primary)
+              : c.primary,
           backgroundColor: c.container,
+          side: c.isDark
+              ? BorderSide(color: c.primary.withValues(alpha: 0.45))
+              : null,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
           ),

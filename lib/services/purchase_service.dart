@@ -8,8 +8,16 @@ import 'package:in_app_purchase/in_app_purchase.dart';
 /// Entitlement identifier (kept for API compatibility).
 const kProEntitlement = 'pro';
 
-/// Must match the product identifier in App Store / Play Store.
-const kProProductId = 'unlock_full_game_lifetime';
+/// Product identifier — differs per store.
+/// iOS uses `unlock_full_game_lifetime` (already configured in ASC).
+/// Play Store uses `sudoku_pro_unlock` (the old ID was burned by a previous
+/// product create — Google does not let identifiers be reused).
+String get kProProductId {
+  if (kIsWeb) return 'unlock_full_game_lifetime';
+  return defaultTargetPlatform == TargetPlatform.android
+      ? 'sudoku_pro_unlock'
+      : 'unlock_full_game_lifetime';
+}
 
 /// Consumable hint pack — 10 hints for $0.99.
 const kHintPackProductId = 'hint_pack_10';

@@ -32,9 +32,7 @@ class AppBarTitle extends ConsumerWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const SudokuLogoMark(height: 22),
           if (isActive) ...[
-            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
               decoration: BoxDecoration(
@@ -531,7 +529,9 @@ class PauseButton extends ConsumerWidget {
       icon: Icon(
         isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
         color: isActive
-            ? c.primary
+            ? (c.isDark
+                ? (Color.lerp(c.primary, Colors.white, 0.55) ?? c.primary)
+                : c.primary)
             : c.onSurfaceVariant.withValues(alpha: 0.4),
       ),
       tooltip: isPaused

@@ -55,17 +55,17 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color inversePrimary;
 
   Color get cellSelected => Color.alphaBlend(
-        primary.withValues(alpha: isDark ? 0.55 : 0.42),
+        primary.withValues(alpha: isDark ? 0.95 : 0.42),
         pureWhite,
       );
 
   Color get cellSameNumber => Color.alphaBlend(
-        primary.withValues(alpha: isDark ? 0.30 : 0.22),
+        primary.withValues(alpha: isDark ? 0.68 : 0.22),
         pureWhite,
       );
 
   Color get cellHouseHighlight => Color.alphaBlend(
-        primary.withValues(alpha: isDark ? 0.18 : 0.13),
+        primary.withValues(alpha: isDark ? 0.55 : 0.13),
         surface,
       );
 

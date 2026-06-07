@@ -199,7 +199,10 @@ class _NumButtonState extends State<_NumButton>
           color: widget.isComplete
               ? c.primary.withValues(alpha: 0.08)
               : (widget.isEnabled
-                  ? c.container
+                  ? (c.isDark
+                      ? Color.alphaBlend(
+                          c.primary.withValues(alpha: 0.18), c.surface)
+                      : c.container)
                   : c.outline.withValues(alpha: c.isDark ? 0.18 : 0.1)),
           borderRadius: BorderRadius.circular(10),
           child: InkWell(
@@ -211,7 +214,7 @@ class _NumButtonState extends State<_NumButton>
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                   color: widget.isEnabled
-                      ? c.primary.withValues(alpha: c.isDark ? 0.25 : 0.10)
+                      ? c.primary.withValues(alpha: c.isDark ? 0.5 : 0.10)
                       : Colors.transparent,
                 ),
               ),
@@ -222,13 +225,15 @@ class _NumButtonState extends State<_NumButton>
                     // In dark mode, primary blended with white reads MUCH stronger
                     // against the lightened container background.
                     color: widget.isComplete
-                        ? c.primary.withValues(alpha: 0.3)
+                        ? c.primary.withValues(alpha: c.isDark ? 0.55 : 0.3)
                         : (widget.isEnabled
                             ? (c.isDark
-                                ? (Color.lerp(c.primary, Colors.white, 0.35) ??
-                                    c.primary)
+                                ? (Color.lerp(c.primary, Colors.white, 0.88) ??
+                                    Colors.white)
                                 : c.primary)
-                            : c.onSurfaceVariant.withValues(alpha: 0.5)),
+                            : (c.isDark
+                                ? c.onSurface.withValues(alpha: 0.75)
+                                : c.onSurfaceVariant.withValues(alpha: 0.5))),
                     fontWeight: FontWeight.w800,
                   ),
                 ),

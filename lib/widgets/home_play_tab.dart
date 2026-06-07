@@ -78,8 +78,6 @@ class _PlayHeader extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SudokuLogoMark(height: 44),
-              const SizedBox(height: 8),
               Text(
                 AppLocalizations.of(context).whichDifficultyToday,
                 style: GoogleFonts.nunito(
